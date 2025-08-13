@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dump Trailer — iPhone</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{-webkit-tap-highlight-color:transparent}</style>
+</head>
+<body class="bg-gray-50">
+  <div class="min-h-screen p-3 sm:p-4 max-w-xl mx-auto">
+    <header class="mb-3">
+      <h1 class="text-2xl font-semibold">Dump Trailer — iPhone</h1>
+      <div class="mt-2 grid grid-cols-1 gap-2">
+        <div class="flex gap-2 items-center">
+          <label class="text-sm text-gray-600">Hub</label>
+          <select id="hubSelect" class="flex-1 rounded-xl border px-3 py-2"></select>
+        </div>
+        <div class="flex gap-2">
+          <input id="newHub" class="flex-1 rounded-xl border px-3 py-2" placeholder="Add new hub address" />
+          <button id="addHubBtn" class="rounded-xl px-3 py-2 bg-black text-white">Add Hub</button>
+        </div>
+      </div>
+    </header>
+    <div class="flex gap-2 mb-3">
+      <button data-tab="today" class="tab px-3 py-2 rounded-xl border bg-black text-white">Today</button>
+      <button data-tab="tomorrow" class="tab px-3 py-2 rounded-xl border bg-white">Tomorrow</button>
+      <button data-tab="week" class="tab px-3 py-2 rounded-xl border bg-white">This Week</button>
+      <button data-tab="all" class="tab px-3 py-2 rounded-xl border bg-white">All</button>
+    </div>
+    <div class="bg-white rounded-2xl shadow p-3 mb-3">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="date" class="rounded-xl border px-3 py-2" placeholder="Date (YYYY-MM-DD)" />
+        <input id="time" class="rounded-xl border px-3 py-2" placeholder="Time" />
+        <input id="customer" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Customer name" />
+        <input id="address" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Address" />
+        <input id="material" class="rounded-xl border px-3 py-2" placeholder="Material" />
+        <input id="loadSize" class="rounded-xl border px-3 py-2" placeholder="Load Size" />
+        <input id="price" class="rounded-xl border px-3 py-2" placeholder="Price" />
+        <select id="status" class="rounded-xl border px-3 py-2">
+          <option>Scheduled</option>
+          <option>In Progress</option>
+          <option>Complete</option>
+          <option>Canceled</option>
+        </select>
+      </div>
+      <div class="mt-2 flex gap-2">
+        <button id="addJobBtn" class="rounded-xl px-4 py-2 bg-black text-white">Add Job</button>
+      </div>
+    </div>
+    <div id="list" class="space-y-2"></div>
+  </div>
+<script>
+  function todayStr() { return new Date().toISOString().slice(0,10); }
+  function tomorrowStr() { return new Date(Date.now()+86400000).toISOString().slice(0,10); }
+  function withinWeek(d) {
+    const dt = new Date(d+'T00:00:00');
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(start); end.setDate(end.getDate()+6);
+    return dt >= start && dt <= end;
+  }
+  function normalizeDate(input) {
+    if (!input) return todayStr();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+    return todayStr();
+  }
+  function uid() { return String(Date.now()) + Math.random().toString(36).slice(2); }
+  function readLS(k,f){try{let v=localStorage.getItem(k);return v?JSON.parse(v):f}catch{return f}}
+  function writeLS(k,v){localStorage.setItem(k,JSON.stringify(v))}
+  let hubs=readLS('dt_hubs',['Sample & Son, Evans, GA','4567 Chamberlain Ferry Rd, Lincolnton, GA 30817']);
+  let selectedHub=readLS('dt_selected_hub',hubs[0]);
+  let jobs=readLS('dt_jobs',[]);
+  let tab='today';
+  const hubSelect=document.getElementById('hubSelect');
+  const newHub=document.getElementById('newHub');
+  const addHubBtn=document.getElementById('addHubBtn');
+  const list=document.getElementById('list');
+  const dateI=document.getElementById('date');
+  const timeI=document.getElementById('time');
+  const customerI=document.getElementById('customer');
+  const addressI=document.getElementById('address');
+  const materialI=document.getElementById('material');
+  const loadSizeI=document.getElementById('loadSize');
+  const priceI=document.getElementById('price');
+  const statusI=document.getElementById('status');
+  function renderHubs(){
+    hubSelect.innerHTML='';
+    hubs.forEach(h=>{let o=document.createElement('option');o.value=h;o.textContent=h;hubSelect.appendChild(o)});
+    hubSelect.value=selectedHub;
+  }
+  function filteredJobs(){
+    if(tab==='today')return jobs.filter(j=>j.date===todayStr());
+    if(tab==='tomorrow')return jobs.filter(j=>j.date===tomorrowStr());
+    if(tab==='week')return jobs.filter(j=>withinWeek(j.date));
+    return jobs;
+  }
+  function openAppleMaps(hub,addr){
+    const url='http://maps.apple.com/?saddr='+encodeURIComponent(hub)+'&daddr='+encodeURIComponent(addr);
+    window.open(url,'_blank');
+  }
+  function renderList(){
+    list.innerHTML='';
+    const items=filteredJobs();
+    if(!items.length){let d=document.createElement('div');d.className='text-center text-gray-500';d.textContent='No jobs yet';list.appendChild(d);return;}
+    for(const job of items){
+      const card=document.createElement('div');
+      card.className='bg-white rounded-2xl shadow p-3 flex justify-between items-center';
+      const left=document.createElement('div');
+      left.innerHTML='<div class="font-medium">'+job.customer+'</div><div class="text-sm text-gray-600">'+job.date+' '+job.time+'</div><div class="text-sm">'+job.address+'</div>';
+      const goBtn=document.createElement('button');
+      goBtn.className='rounded-xl px-3 py-2 bg-black text-white';
+      goBtn.textContent='GO';
+      goBtn.onclick=()=>openAppleMaps(selectedHub,job.address);
+      card.appendChild(left);
+      card.appendChild(goBtn);
+      list.appendChild(card);
+    }
+  }
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('bg-black','text-white'));
+      btn.classList.add('bg-black','text-white');
+      tab=btn.dataset.tab;renderList();
+    };
+  });
+  addHubBtn.onclick=()=>{
+    const val=newHub.value.trim();if(!val)return;
+    if(!hubs.includes(val))hubs.push(val);
+    selectedHub=val;newHub.value='';renderHubs();writeLS('dt_hubs',hubs);writeLS('dt_selected_hub',selectedHub);
+  };
+  hubSelect.onchange=()=>{selectedHub=hubSelect.value;writeLS('dt_selected_hub',selectedHub);};
+  document.getElementById('addJobBtn').onclick=()=>{
+    const job={id:uid(),date:normalizeDate(dateI.value||todayStr()),time:timeI.value||'',customer:customerI.value||'',address:addressI.value||'',material:materialI.value||'',loadSize:loadSizeI.value||'',price:priceI.value||'',status:statusI.value||'Scheduled'};
+    if(!job.address||!job.customer)return;jobs.push(job);writeLS('dt_jobs',jobs);
+    dateI.value=timeI.value=customerI.value=addressI.value=materialI.value=loadSizeI.value=priceI.value='';statusI.value='Scheduled';renderList();
+  };
+  renderHubs();dateI.value=todayStr();renderList();
+</script>
+</body>
+</html>
