@@ -7,8 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAASUlEQVR42u3OMQEAIAwEsbT9ZxSgZqg0E1gD7y5w2gAAAPxXv3gAAAD8Z2hCAAAAAPwMAAAA/DAAAAD8DAAAAPwwAAAA/AwAAAD8MJD3A7lJkqT4AAAAAElFTkSuQmCC">
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>body{-webkit-tap-highlight-color:transparent}</style>
@@ -16,7 +16,8 @@
 <body class="bg-gray-50">
   <div id="root"></div>
 
-  <script type="text/babel">
+  <!-- IMPORTANT: add data-presets so JSX compiles on GitHub Pages -->
+  <script type="text/babel" data-presets="react,env">
     const { useEffect, useMemo, useState } = React;
 
     function App() {
@@ -103,12 +104,13 @@
       };
 
       function normalizeDate(input){
+        // Accept YYYY-MM-DD or MM/DD/YYYY, return YYYY-MM-DD
         if(/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
         const m=input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
         if(!m) return todayStr;
-        let [_,mm,dd,yy]=m; // eslint-disable-line
-        if(yy.length===2) yy=(yy<50?'20':'19')+yy;
-        return `${yy.padStart(2,'0')}-${dd.padStart(2,'0')}-${String(yy).padStart(4,'0')}`;
+        let [,mm,dd,yy]=m;
+        if(yy.length===2) yy=(+yy<50?'20':'19')+yy;
+        return `${String(yy).padStart(4,'0')}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
       }
 
       const openAppleMaps=(hub,addr)=>{
