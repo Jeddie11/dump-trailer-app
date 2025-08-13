@@ -108,7 +108,7 @@
         if(!m) return todayStr;
         let [_,mm,dd,yy]=m; // eslint-disable-line
         if(yy.length===2) yy=(yy<50?'20':'19')+yy;
-        return `${yy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+        return `${yy.padStart(2,'0')}-${dd.padStart(2,'0')}-${String(yy).padStart(4,'0')}`;
       }
 
       const openAppleMaps=(hub,addr)=>{
