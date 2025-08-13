@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dump Trailer — iPhone</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <!-- iOS/General Icons (make sure icons/ folder is in repo) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --brand-yellow: #FACC15; --brand-black: #000; }
+    body { -webkit-tap-highlight-color: transparent; }
+    /* Splash overlay */
+    #splash {
+      position: fixed; inset: 0; background: #000; display: flex;
+      align-items: center; justify-content: center; z-index: 50;
+      transition: opacity .4s ease;
+    }
+    #splash svg { color: var(--brand-yellow); width: 96px; height: 96px; }
+    #splash.hide { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <!-- Splash screen (logo on black) -->
+  <div id="splash" aria-hidden="true">
+    <!-- Dump trailer logo (matches app icon) -->
+    <svg viewBox="0 0 64 64" fill="currentColor" aria-label="Dump Trailer">
+      <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+    </svg>
+  </div>
+
+  <div class="min-h-screen p-3 sm:p-4 max-w-xl mx-auto">
+    <!-- Header / Branding -->
+    <header class="mb-3 rounded-2xl bg-black text-[var(--brand-yellow)] p-3 flex items-center gap-3 shadow">
+      <svg width="36" height="36" viewBox="0 0 64 64" fill="currentColor" class="shrink-0">
+        <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+      </svg>
+      <div>
+        <div class="text-xl font-semibold leading-tight">Dump Trailer</div>
+        <div class="text-xs opacity-80">Hub → Customer • Apple Maps</div>
+      </div>
+    </header>
+
+    <!-- Hub controls -->
+    <div class="mt-2 grid grid-cols-1 gap-2">
+      <div class="flex gap-2 items-center">
+        <label class="text-sm text-gray-700">Hub</label>
+        <select id="hubSelect" class="flex-1 rounded-xl border px-3 py-2"></select>
+      </div>
+      <div class="flex gap-2">
+        <input id="newHub" class="flex-1 rounded-xl border px-3 py-2" placeholder="Add new hub address" />
+        <button id="addHubBtn" class="rounded-xl px-3 py-2 text-black" style="background:var(--brand-yellow)">Add Hub</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 my-3">
+      <button data-tab="today" class="tab px-3 py-2 rounded-xl border bg-black text-white">Today</button>
+      <button data-tab="tomorrow" class="tab px-3 py-2 rounded-xl border bg-white">Tomorrow</button>
+      <button data-tab="week" class="tab px-3 py-2 rounded-xl border bg-white">This Week</button>
+      <button data-tab="all" class="tab px-3 py-2 rounded-xl border bg-white">All</button>
+    </div>
+
+    <!-- Quick add form -->
+    <div class="bg-white rounded-2xl shadow p-3 mb-3">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="date" class="rounded-xl border px-3 py-2" placeholder="Date (YYYY-MM-DD or MM/DD/YYYY)" />
+        <input id="time" class="rounded-xl border px-3 py-2" placeholder="Time (e.g., 10:30 AM)" />
+        <input id="customer" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Customer name" />
+        <input id="address" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Address" />
+        <select id="material" class="rounded-xl border px-3 py-2">
+          <option value="">Material</option>
+          <option>Crush & Run</option>
+          <option>#57 Stone</option>
+          <option>Clean Sand</option>
+          <option>Sand Clay</option>
+          <option>Fill Dirt</option>
+          <option>Top Soil</option>
+          <option>#4 Stone</option>
+        </select>
+        <select id="loadSize" class="rounded-xl border px-3 py-2">
+          <option value="">Load Size (tons)</option>
+          <option value="1">1 ton</option>
+          <option value="2">2 tons</option>
+          <option value="3">3 tons</option>
+          <option value="4">4 tons</option>
+        </select>
+        <input id="price" class="rounded-xl border px-3 py-2" placeholder="Price (auto)" />
+        <select id="status" class="rounded-xl border px-3 py-2">
+          <option>Scheduled</option>
+          <option>In Progress</option>
+          <option>Complete</option>
+          <option>Canceled</option>
+        </select>
+      </div>
+      <div class="mt-2 flex gap-2">
+        <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
+        <button id="exportBtn" class="rounded-xl px-4 py-2 border">Export</button>
+        <label class="rounded-xl px-4 py-2 border cursor-pointer">Import
+          <input id="importInput" type="file" class="hidden" accept="application/json" />
+        </label>
+      </div>
+      <div id="autoNote" class="text-xs text-gray-500 mt-2"></div>
+    </div>
+
+    <!-- Paste box -->
+    <div class="bg-white rounded-2xl shadow p-3 mb-3">
+      <p class="text-sm text-gray-600 mb-2">
+        Paste orders from Messenger (Name, Address, Material, Tons 1–4). Blank line = next job.
+      </p>
+      <textarea id="pasteBox" class="w-full rounded-xl border p-2 h-28" placeholder="Sarah Branon
+5727 Old Augusta Hwy, Grovetown GA 30813
+Crush & Run
+3 tons
+
+Leonard Gibson
+3648 Thomson Hwy, Lincolnton GA 30817
+#57 Stone
+2 tons"></textarea>
+      <div class="mt-2 flex gap-2">
+        <button id="pasteBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Pasted Rows</button>
+        <button id="clearPaste" class="rounded-xl px-4 py-2 border">Clear</button>
+      </div>
+    </div>
+
+    <!-- Jobs list -->
+    <div id="list" class="space-y-2"></div>
+    <footer class="h-10"></footer>
+  </div>
+
+<script>
+  // ===== Helpers =====
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function tomorrowStr(){ return new Date(Date.now()+86400000).toISOString().slice(0,10); }
+  function withinWeek(d){
+    const dt=new Date(d+'T00:00:00'); const start=new Date(); start.setHours(0,0,0,0);
+    const end=new Date(start); end.setDate(end.getDate()+6); return dt>=start && dt<=end;
+  }
+  function normalizeDate(input){
+    if(!input) return todayStr();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+    const m=input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if(!m) return todayStr();
+    let mm=m[1],dd=m[2],yy=m[3];
+    if(yy.length===2) yy=(parseInt(yy,10)<50?'20':'19')+yy;
+    return String(yy).padStart(4,'0')+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+  }
+  function uid(){ return String(Date.now())+Math.random().toString(36).slice(2); }
+  function readLS(k,f){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} }
+  function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+
+  // ===== Price per ton mapping (charges) =====
+  const PRICE_PER_TON = {
+    "Crush & Run": 60,
+    "#57 Stone": 70,
+    "Clean Sand": 65,
+    "Top Soil": 60,
+    "#4 Stone": 70,
+    "Sand Clay": null,
+    "Fill Dirt": null
+  };
+
+  // ===== State =====
+  let hubs = readLS('dt_hubs', ['Sample & Son, Evans, GA','4567 Chamberlain Ferry Rd, Lincolnton, GA 30817']);
+  let selectedHub = readLS('dt_selected_hub', hubs[0]);
+  let jobs = readLS('dt_jobs', []);
+  let tab = 'today';
+
+  // ===== DOM =====
+  const hubSelect = document.getElementById('hubSelect');
+  const newHub = document.getElementById('newHub');
+  const addHubBtn = document.getElementById('addHubBtn');
+
+  const dateI = document.getElementById('date');
+  const timeI = document.getElementById('time');
+  const customerI = document.getElementById('customer');
+  const addressI = document.getElementById('address');
+  const materialI = document.getElementById('material');
+  const loadSizeI = document.getElementById('loadSize');
+  const priceI = document.getElementById('price');
+  const statusI = document.getElementById('status');
+  const autoNote = document.getElementById('autoNote');
+
+  const list = document.getElementById('list');
+  const pasteBox = document.getElementById('pasteBox');
+  const pasteBtn = document.getElementById('pasteBtn');
+  const clearPaste = document.getElementById('clearPaste');
+  const addJobBtn = document.getElementById('addJobBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const importInput = document.getElementById('importInput');
+
+  // ===== Splash fade =====
+  window.addEventListener('load', () => {
+    setTimeout(() => document.getElementById('splash').classList.add('hide'), 400);
+  });
+
+  // ===== Init =====
+  function renderHubs(){
+    hubSelect.innerHTML='';
+    hubs.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; hubSelect.appendChild(o); });
+    hubSelect.value = selectedHub;
+  }
+
+  function calcPrice(){
+    const mat = materialI.value;
+    const tons = parseFloat(loadSizeI.value || '0');
+    const per = PRICE_PER_TON[mat];
+    if(!mat || !tons){ priceI.value=''; autoNote.textContent=''; return; }
+    if(per==null){
+      priceI.value='';
+      autoNote.textContent='Set price manually for '+mat+' (no rate yet).';
+      return;
+    }
+    const price = Math.round(per * tons * 100)/100;
+    priceI.value = String(price);
+    autoNote.textContent = mat+' @ $'+per+'/ton × '+tons+' tons';
+  }
+  materialI.onchange = calcPrice;
+  loadSizeI.onchange = calcPrice;
+
+  function filteredJobs(){
+    if(tab==='today') return jobs.filter(j => j.date === todayStr() && j.status!=='Complete' && j.status!=='Canceled');
+    if(tab==='tomorrow') return jobs.filter(j => j.date === tomorrowStr() && j.status!=='Complete' && j.status!=='Canceled');
+    if(tab==='week') return jobs.filter(j => withinWeek(j.date) && j.status!=='Complete' && j.status!=='Canceled');
+    return jobs;
+  }
+
+  function openAppleMaps(hub,addr){
+    const url = 'http://maps.apple.com/?saddr='+encodeURIComponent(hub)+'&daddr='+encodeURIComponent(addr);
+    window.open(url, '_blank');
+  }
+
+  function saveJobs(){ writeLS('dt_jobs', jobs); }
+  function saveHubs(){ writeLS('dt_hubs', hubs); }
+  function saveSelectedHub(){ writeLS('dt_selected_hub', selectedHub); }
+
+  function renderList(){
+    list.innerHTML='';
+    const items = filteredJobs();
+    if(!items.length){
+      const div=document.createElement('div'); div.className='text-center text-gray-500'; div.textContent='No jobs here yet.'; list.appendChild(div); return;
+    }
+    for(const job of items){
+      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3';
+      const row=document.createElement('div'); row.className='flex justify-between items-center';
+
+      const left=document.createElement('div');
+      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
+      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
+      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
+      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
+      meta.textContent=[job.material, job.loadSize? (job.loadSize+' tons'):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+
+      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
+      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)';
+      goBtn.textContent='GO'; goBtn.onclick=()=>openAppleMaps(selectedHub, job.address);
+
+      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
+      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o); });
+      statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
+
+      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
+      delBtn.onclick=()=>{ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); };
+
+      right.appendChild(goBtn); right.appendChild(statusSel); right.appendChild(delBtn);
+      row.appendChild(left); row.appendChild(right);
+      card.appendChild(row); list.appendChild(card);
+    }
+  }
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('bg-black','text-white'));
+      btn.classList.add('bg-black','text-white'); tab = btn.dataset.tab; renderList();
+    };
+  });
+
+  // Hubs
+  addHubBtn.onclick=()=>{
+    const val = newHub.value.trim(); if(!val) return;
+    if(!hubs.includes(val)) hubs.push(val);
+    selectedHub = val; newHub.value=''; renderHubs(); saveHubs(); saveSelectedHub();
+  };
+  hubSelect.onchange=()=>{ selectedHub = hubSelect.value; saveSelectedHub(); };
+
+  // Add Job
+  addJobBtn.onclick=()=>{
+    calcPrice(); // ensure price reflects dropdowns
+    const tons = loadSizeI.value ? parseFloat(loadSizeI.value) : null;
+    const job={
+      id: uid(),
+      date: normalizeDate(dateI.value || todayStr()),
+      time: timeI.value || '',
+      customer: customerI.value || '',
+      address: addressI.value || '',
+      material: materialI.value || '',
+      loadSize: tons || '',
+      price: priceI.value || '',
+      status: statusI.value || 'Scheduled'
+    };
+    if(!job.address || !job.customer) return;
+    jobs.push(job); saveJobs();
+    timeI.value = customerI.value = addressI.value = ''; materialI.value=''; loadSizeI.value=''; priceI.value=''; statusI.value='Scheduled'; dateI.value = todayStr();
+    renderList();
+  };
+
+  // Paste: smart parser (blocks split by blank lines; tries to find name, address, material, tons)
+  function parseBlocks(text){
+    const blocks = text.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
+    const out = [];
+    const mats = Object.keys(PRICE_PER_TON);
+    for(const b of blocks){
+      const lines = b.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+      let name='', addr='', mat='', tons=null;
+      for(const ln of lines){
+        const low = ln.toLowerCase();
+        // material
+        for(const m of mats){
+          if(low.includes(m.toLowerCase())) { mat = m; break; }
+        }
+        // tons
+        const tm = low.match(/(\d+(?:\.\d+)?)\s*(?:t|tons?)/);
+        if(tm) tons = parseFloat(tm[1]);
+        // crude address heuristic: has numbers and street-y words
+        if(!addr && /\d+/.test(ln) && /(st|rd|ave|hwy|highway|drive|dr|road|rd\.|ga|georgia|street|lane|ln|way|blvd|circle|ct|court|place|plz|plaza|pkwy|parkway)/i.test(ln)){
+          addr = ln;
+        }
+      }
+      // name fallback = first non-empty line that isn't the address or material
+      if(!name){
+        for(const ln of lines){
+          if(ln===addr) continue;
+          if(mats.some(m=>ln.toLowerCase().includes(m.toLowerCase()))) continue;
+          name = ln; break;
+        }
+      }
+      if(addr){
+        out.push({customer:name||'', address:addr, material:mat||'', loadSize:tons||'', price:''});
+      }
+    }
+    return out;
+  }
+
+  pasteBtn.onclick=()=>{
+    const text = pasteBox.value;
+    const rows = parseBlocks(text);
+    if(!rows.length) return;
+    for(const r of rows){
+      // auto price if we can
+      let autoPrice = '';
+      if(r.material && r.loadSize && PRICE_PER_TON.hasOwnProperty(r.material) && PRICE_PER_TON[r.material]!=null){
+        autoPrice = String(Math.round(PRICE_PER_TON[r.material]*parseFloat(r.loadSize)*100)/100);
+      }
+      jobs.push({
+        id: uid(),
+        date: todayStr(),
+        time: '',
+        customer: r.customer || '',
+        address: r.address || '',
+        material: r.material || '',
+        loadSize: r.loadSize || '',
+        price: autoPrice,
+        status: 'Scheduled'
+      });
+    }
+    saveJobs(); pasteBox.value=''; renderList();
+  };
+  clearPaste.onclick=()=>{ pasteBox.value=''; };
+
+  // Start
+  renderHubs();
+  document.getElementById('date').value = todayStr();
+  renderList();
+</script>
+</body>
+</html>
