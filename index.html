@@ -889,6 +889,21 @@ Leonard Gibson
 })();
 </script>
 <!-- === /Floating Zone picker + price wiring === -->
+<style>
+  .zone-fab{
+    position:fixed;
+    right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    z-index:9999;
+    display:flex;align-items:center;gap:8px;
+    background:#111827;color:#fff;padding:10px 12px;border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,.35);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif
+  }
+  .zone-fab button{border:1px solid #374151;background:#1f2937;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700;cursor:pointer}
+  .zone-fab button.active{background:#2563eb;border-color:#2563eb}
+  .zone-chip{font-size:13px;margin-top:6px;color:#111}
+</style>
 
 </body>
 </html>
