@@ -400,5 +400,179 @@ Leonard Gibson
 
   const title = el("div", { class: "zqw-title", text: "Quick Quote" });
 
-</body>
+<!-- === Quick Quote (Zone tabs) — drop-in widget === -->
+<div id="zone-quote-widget"></div>
+
+<script>
+(function () {
+  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
+  const defaults = {
+    zones: [
+      { id: "zone1", label: "Zone 1 (Local)" },
+      { id: "zone2", label: "Zone 2 (Extended)" },
+    ],
+    materials: [
+      { id: "fill_dirt", label: "Fill Dirt", unit: "yard",
+        minEnabled: false, minimum: 100,
+        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
+                       zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
+      { id: "crush_and_run", label: "Crush & Run", unit: "ton",
+        minEnabled: true, minimum: 100,
+        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
+                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] } },
+      { id: "no57", label: "#57 Stone", unit: "ton",
+        minEnabled: true, minimum: 100,
+        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
+                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] } },
+      { id: "no4", label: "#4 Stone", unit: "ton",
+        minEnabled: true, minimum: 100,
+        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140}],
+                       zone2:[{qty:1,price:100},{qty:2,price:200}] } },
+    ],
+    bannerNote: "Driveway-safe delivery · Max 4 yards per load (where noted).",
+    businessName: "JE Hauling • 706.589.0657"
+  };
+
+  const master = (() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }
+    catch { return defaults; }
+  })();
+
+  const root = document.getElementById("zone-quote-widget");
+  if (!root) return;
+
+  const style = document.createElement("style");
+  style.textContent = `
+    #zone-quote-widget { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    .zqw-card { max-width: 720px; margin: 12px auto; padding: 14px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
+    .zqw-title { font-weight: 700; font-size: 18px; margin-bottom: 10px; }
+    .zqw-tabs { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+    .zqw-tab { padding:8px 12px; border-radius: 999px; border:1px solid #d1d5db; background:#f3f4f6; cursor:pointer; font-weight:600; }
+    .zqw-tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+    .zqw-row { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
+    .zqw-row > div { display:flex; flex-direction:column; gap:6px; }
+    .zqw-label { font-size:12px; color:#6b7280; }
+    .zqw-select, .zqw-input { padding:10px 12px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
+    .zqw-total { margin-top:12px; padding:12px; border-radius:12px; background:#f9fafb; border:1px solid #e5e7eb; }
+    .zqw-total .num { font-weight:800; font-size:28px; }
+    .zqw-sub { font-size:12px; color:#6b7280; margin-top:4px; }
+    .zqw-btn { margin-top:10px; display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:1px solid #2563eb; background:#2563eb; color:#fff; cursor:pointer; font-weight:700; }
+    .zqw-copy { font-size:12px; color:#6b7280; margin-top:6px; overflow:auto; white-space:nowrap; }
+    @media (max-width:720px){ .zqw-row { grid-template-columns: 1fr; } .zqw-card{ margin: 12px } }
+  `;
+  document.head.appendChild(style);
+
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    Object.entries(attrs).forEach(([k,v]) => k==="class" ? (n.className = v) : k==="text" ? (n.textContent = v) : n.setAttribute(k,v));
+    kids.flat().forEach(k => n.appendChild(typeof k === "string" ? document.createTextNode(k) : k));
+    return n;
+  };
+  const priceFor = (material, zoneId, qty) => {
+    const tiers = material.tiersByZone[zoneId] || [];
+    const t = tiers.find(tt => Number(tt.qty) === Number(qty));
+    if (!t) return { base: 0, total: 0, note: "Qty not in tier table" };
+    const base = Number(t.price || 0);
+    const total = material.minEnabled ? Math.max(base, Number(material.minimum || 0)) : base;
+    return { base, total };
+  };
+
+  let zoneId = (master.zones[0] && master.zones[0].id) || "zone1";
+  let materialId = (master.materials[0] && master.materials[0].id) || "";
+  let qty = 1;
+
+  const card = el("div", { class: "zqw-card" });
+  const title = el("div", { class: "zqw-title", text: "Quick Quote" });
+
+  const tabs = el("div", { class: "zqw-tabs" });
+  const makeTabs = () => {
+    tabs.innerHTML = "";
+    master.zones.forEach(z => {
+      const b = el("button", { class: "zqw-tab" + (z.id === zoneId ? " active" : "") }, z.label);
+      b.onclick = () => { zoneId = z.id; makeTabs(); updateTotal(); };
+      tabs.appendChild(b);
+    });
+  };
+
+  const row = el("div", { class: "zqw-row" });
+  const matBox = el("div", {},
+    el("div", { class: "zqw-label", text: "Material" }),
+    (() => {
+      const s = el("select", { class: "zqw-select" });
+      master.materials.forEach(m => s.appendChild(el("option", { value: m.id, text: m.label })));
+      s.onchange = () => { materialId = s.value; updateTotal(); };
+      materialId && (s.value = materialId);
+      return s;
+    })()
+  );
+  const qtyBox = el("div", {},
+    el("div", { class: "zqw-label", text: "Quantity" }),
+    (() => {
+      const s = el("select", { class: "zqw-select" });
+      [1,2,3,4].forEach(n => s.appendChild(el("option", { value: String(n), text: String(n) })));
+      s.onchange = () => { qty = Number(s.value); updateTotal(); };
+      return s;
+    })()
+  );
+  const noteBox = el("div", {},
+    el("div", { class: "zqw-label", text: "Note" }),
+    el("div", { class: "zqw-sub", text: master.bannerNote || " " })
+  );
+  row.appendChild(matBox); row.appendChild(qtyBox); row.appendChild(noteBox);
+
+  const totalWrap = el("div", { class: "zqw-total" },
+    el("div", { class: "zqw-label", text: "Quoted Total" }),
+    el("div", { class: "num", id: "zqw-num" }, "—"),
+    el("div", { class: "zqw-sub", id: "zqw-sub" }, "")
+  );
+
+  const copyBtn = el("button", { class: "zqw-btn" }, "Copy to Messenger");
+  const copyLine = el("div", { class: "zqw-copy", id: "zqw-copy" });
+
+  copyBtn.onclick = async () => {
+    const m = master.materials.find(mm => mm.id === materialId);
+    const z = master.zones.find(zz => zz.id === zoneId);
+    if (!m || !z) return;
+    const { total, base } = priceFor(m, zoneId, qty);
+    const unit = m.unit === "yard" ? "yard" : "ton";
+    const line = `${m.label} — ${qty} ${unit}${qty>1?"s":""} · ${z.label} · $${total} — ${master.businessName || ""}`.trim();
+    try { await navigator.clipboard.writeText(line); alert("Copied to clipboard!"); }
+    catch {
+      const ta = document.createElement("textarea"); ta.value = line;
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+      alert("Copied to clipboard!");
+    }
+  };
+
+  const updateTotal = () => {
+    const num = card.querySelector("#zqw-num");
+    const sub = card.querySelector("#zqw-sub");
+    const cpy = card.querySelector("#zqw-copy");
+    const m = master.materials.find(mm => mm.id === materialId);
+    const z = master.zones.find(zz => zz.id === zoneId);
+    if (!m || !z) { num.textContent = "—"; sub.textContent = ""; cpy.textContent = ""; return; }
+    const { total, base } = priceFor(m, zoneId, qty);
+    num.textContent = total ? `$${total.toFixed(0)}` : "—";
+    sub.textContent = total ? `Base tier: $${base.toFixed(0)}${m.minEnabled ? ` · Min applied: $${(m.minimum||0)}` : ""}` : "Select a valid qty for this material/zone";
+    const unit = m.unit === "yard" ? "yard" : "ton";
+    cpy.textContent = `${m.label} — ${qty} ${unit}${qty>1?"s":""} · ${z.label} · $${total} — ${master.businessName || ""}`;
+  };
+
+  makeTabs();
+  const card = document.createElement("div");
+  card.className = "zqw-card";
+  card.appendChild(title);
+  card.appendChild(tabs);
+  card.appendChild(row);
+  card.appendChild(totalWrap);
+  card.appendChild(copyBtn);
+  card.appendChild(copyLine);
+  root.appendChild(card);
+
+  updateTotal();
+})();
+</script>
+<!-- === /Quick Quote (Zone tabs) === -->
+
+ </body>
 </html>
