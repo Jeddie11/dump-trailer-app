@@ -736,6 +736,159 @@ Leonard Gibson
 })();
 </script>
 <!-- === /Quick Quote (Zone tabs) — corrected === -->
+<!-- === Floating Zone picker + price wiring (drop-in) === -->
+<style>
+  .zone-fab {
+    position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+    display: flex; align-items: center; gap: 8px;
+    background: #111827; color: #fff; padding: 10px 12px; border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.35); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  .zone-fab button {
+    border: 1px solid #374151; background: #1f2937; color: #fff; padding: 6px 10px; border-radius: 999px; font-weight: 700; cursor: pointer;
+  }
+  .zone-fab button.active { background: #2563eb; border-color: #2563eb; }
+  .zone-chip { font-size: 13px; margin-top: 6px; color: #111; }
+</style>
+
+<div class="zone-fab" id="zoneFab">
+  <span style="font-weight:600;opacity:.9">Zone</span>
+  <button type="button" data-zone="zone1" class="active">1</button>
+  <button type="button" data-zone="zone2">2</button>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
+
+  // Load master pricing from Admin page (falls back to safe defaults)
+  const defaults = {
+    zones:[{id:"zone1",label:"Zone 1 (Local)"},{id:"zone2",label:"Zone 2 (Extended)"}],
+    materials:[
+      { id:"fill_dirt", label:"Fill Dirt", unit:"yard", minEnabled:false, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
+                      zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] }},
+      { id:"crush_and_run", label:"Crush & Run", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
+                      zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] }},
+      { id:"no57", label:"#57 Stone", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
+                      zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] }},
+      { id:"no4", label:"#4 Stone", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140}],
+                      zone2:[{qty:1,price:100},{qty:2,price:200}] }}
+    ]
+  };
+  const master = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }catch{ return defaults; } })();
+
+  // Heuristics to find your existing controls on the page
+  function findMaterialSelect(){
+    for (const s of document.querySelectorAll('select')) {
+      const opts = [...s.options].map(o=>o.textContent.trim().toLowerCase());
+      if (opts.includes('crush & run') && (opts.includes('#57 stone') || opts.includes('fill dirt'))) return s;
+    }
+    return null;
+  }
+  function findQtySelect(){
+    // looks for options like "1 ton", "2 tons", etc.
+    for (const s of document.querySelectorAll('select')) {
+      const hasTon = [...s.options].some(o => /\bton(s)?\b/i.test(o.textContent));
+      if (hasTon) return s;
+    }
+    return null;
+  }
+  function findPriceInput(){
+    // try placeholder or name containing "price"
+    for (const el of document.querySelectorAll('input,textarea')) {
+      const ph=(el.getAttribute('placeholder')||'').toLowerCase();
+      const nm=(el.getAttribute('name')||'').toLowerCase();
+      if (ph.includes('price') || nm.includes('price')) return el;
+    }
+    // try label "Price"
+    for (const lab of document.querySelectorAll('label')) {
+      if (lab.textContent.toLowerCase().includes('price')) {
+        const id=lab.getAttribute('for'); if (id){ const t=document.getElementById(id); if (t) return t; }
+      }
+    }
+    return null;
+  }
+
+  const matSel = findMaterialSelect();
+  const qtySel = findQtySelect();
+  const priceEl = findPriceInput();
+
+  // if we can't find material or qty, quietly stop (nothing breaks your page)
+  if (!matSel || !qtySel) return;
+
+  // Create a little text chip under the price as a visual confirmation
+  const chip = document.createElement('div');
+  chip.className = 'zone-chip';
+  (priceEl?.parentElement || qtySel.parentElement || matSel.parentElement).appendChild(chip);
+
+  // Price math from the master sheet
+  function materialByLabel(label){
+    return (master.materials||[]).find(m => (m.label||'').toLowerCase() === (label||'').toLowerCase());
+  }
+  function qtyNumber(){
+    const t = String(qtySel.value||'');
+    const m = t.match(/\d+/);
+    return m ? Number(m[0]) : Number(t)||1;
+  }
+  function priceFor(material, zoneId, qty){
+    const tiers = material?.tiersByZone?.[zoneId] || [];
+    const t = tiers.find(tt => Number(tt.qty) === Number(qty));
+    if (!t) return null;
+    const base = Number(t.price||0);
+    const total = material.minEnabled ? Math.max(base, Number(material.minimum||0)) : base;
+    return { base, total };
+  }
+
+  // Zone picker logic
+  let zoneId = master.zones?.[0]?.id || 'zone1';
+  const fab = document.getElementById('zoneFab');
+  function paintZoneButtons(){
+    fab.querySelectorAll('button[data-zone]').forEach(b=>{
+      b.classList.toggle('active', b.dataset.zone===zoneId);
+    });
+  }
+  fab.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-zone]');
+    if (!btn) return;
+    zoneId = btn.dataset.zone;
+    paintZoneButtons();
+    updatePrice();
+  });
+  paintZoneButtons();
+
+  // Update when material/qty changes
+  matSel.addEventListener('change', updatePrice);
+  qtySel.addEventListener('change', updatePrice);
+
+  function updatePrice(){
+    const matLabel = matSel.options[matSel.selectedIndex]?.text?.trim();
+    const mat = materialByLabel(matLabel);
+    const qty = qtyNumber();
+
+    if (!mat) { chip.textContent='Select a material'; return; }
+    const p = priceFor(mat, zoneId, qty);
+    if (!p) { chip.textContent='No price set for this qty / zone'; return; }
+
+    chip.textContent = `Price (from master, ${zoneId === 'zone2' ? 'Zone 2' : 'Zone 1'}): $${p.total.toFixed(0)}`;
+
+    if (priceEl) {
+      // Fill your "Price (auto)" field
+      priceEl.value = p.total;
+      // Fire events so any other logic on your page reacts
+      priceEl.dispatchEvent(new Event('input', {bubbles:true}));
+      priceEl.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+
+  // initial compute
+  updatePrice();
+})();
+</script>
+<!-- === /Floating Zone picker + price wiring === -->
 
 </body>
 </html>
