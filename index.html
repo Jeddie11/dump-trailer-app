@@ -51,6 +51,23 @@
     Open Admin / Pricing
   </a>
 </div>
+<!-- Shim so old Add-Hub JS never errors even if the button/field were removed -->
+<script>
+  // If the old "Add Hub" elements are missing, create hidden fallbacks
+  if (!document.getElementById('addHubBtn')) {
+    const btn = document.createElement('button');
+    btn.id = 'addHubBtn';
+    btn.type = 'button';
+    btn.style.display = 'none';
+    document.body.appendChild(btn);
+  }
+  if (!document.getElementById('newHub')) {
+    const inp = document.createElement('input');
+    inp.id = 'newHub';
+    inp.type = 'hidden';
+    document.body.appendChild(inp);
+  }
+</script>
 
 
     <!-- Tabs -->
