@@ -22,7 +22,7 @@
   <!-- Splash screen (logo on black) -->
   <div id="splash" aria-hidden="true">
     <svg viewBox="0 0 64 64" fill="currentColor" aria-label="Dump Trailer">
-      <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+      <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
     </svg>
   </div>
 
@@ -30,7 +30,7 @@
     <!-- Header / Branding -->
     <header class="mb-3 rounded-2xl bg-black text-[var(--brand-yellow)] p-3 flex items-center gap-3 shadow">
       <svg width="36" height="36" viewBox="0 0 64 64" fill="currentColor" class="shrink-0">
-        <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+        <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
       </svg>
       <div>
         <div class="text-xl font-semibold leading-tight">Dump Trailer</div>
@@ -44,31 +44,16 @@
         <label class="text-sm text-gray-700">Hub</label>
         <select id="hubSelect" class="flex-1 rounded-xl border px-3 py-2"></select>
       </div>
-      <div class="rounded-2xl bg-white border shadow p-3">
-  <div class="font-semibold text-base">Admin</div>
-  <p class="text-sm text-gray-600 mb-2">Manage materials, zones, and pricing.</p>
-  <a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">
-    Open Admin / Pricing
-  </a>
-</div>
-<!-- Shim so old Add-Hub JS never errors even if the button/field were removed -->
-<script>
-  // If the old "Add Hub" elements are missing, create hidden fallbacks
-  if (!document.getElementById('addHubBtn')) {
-    const btn = document.createElement('button');
-    btn.id = 'addHubBtn';
-    btn.type = 'button';
-    btn.style.display = 'none';
-    document.body.appendChild(btn);
-  }
-  if (!document.getElementById('newHub')) {
-    const inp = document.createElement('input');
-    inp.id = 'newHub';
-    inp.type = 'hidden';
-    document.body.appendChild(inp);
-  }
-</script>
 
+      <!-- Admin card (replaces Add Hub box) -->
+      <div class="rounded-2xl bg-white border shadow p-3">
+        <div class="font-semibold text-base">Admin</div>
+        <p class="text-sm text-gray-600 mb-2">Manage materials, zones, and pricing.</p>
+        <a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">
+          Open Admin / Pricing
+        </a>
+      </div>
+    </div>
 
     <!-- Tabs -->
     <div class="flex gap-2 my-3">
@@ -120,51 +105,45 @@
       <div id="autoNote" class="text-xs text-gray-500 mt-2"></div>
     </div>
 
-    <!-- Paste box -->
-    <div class="bg-white rounded-2xl shadow p-3 mb-3">
-      <p class="text-sm text-gray-600 mb-2">
-        Paste orders from Messenger (Name, Address, Material, Tons 1–4). Blank line = next job.
-      </p>
-      <textarea id="pasteBox" class="w-full rounded-xl border p-2 h-28" placeholder="Sarah Branon
-5727 Old Augusta Hwy, Grovetown GA 30813
-Crush & Run
-3 tons
-
-Leonard Gibson
-3648 Thomson Hwy, Lincolnton GA 30817
-#57 Stone
-2 tons"></textarea>
-      <div class="mt-2 flex gap-2">
-        <button id="pasteBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Pasted Rows</button>
-        <button id="clearPaste" class="rounded-xl px-4 py-2 border">Clear</button>
-      </div>
-    </div>
-
     <!-- Jobs list -->
     <div id="list" class="space-y-2"></div>
     <footer class="h-10"></footer>
   </div>
 
 <script>
+  // ---------- helpers ----------
   function todayStr(){ return new Date().toISOString().slice(0,10); }
   function tomorrowStr(){ return new Date(Date.now()+86400000).toISOString().slice(0,10); }
-  function withinWeek(d){ const dt=new Date(d+'T00:00:00'); const start=new Date(); start.setHours(0,0,0,0); const end=new Date(start); end.setDate(end.getDate()+6); return dt>=start && dt<=end; }
-  function normalizeDate(input){ if(!input) return todayStr(); if(/^\d{4}-\d{2}-\d{2}$/.test(input)) return input; const m=input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(!m) return todayStr(); let mm=m[1],dd=m[2],yy=m[3]; if(yy.length===2) yy=(parseInt(yy,10)<50?'20':'19')+yy; return String(yy).padStart(4,'0')+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0'); }
+  function withinWeek(d){
+    const dt=new Date(d+'T00:00:00');
+    const start=new Date(); start.setHours(0,0,0,0);
+    const end=new Date(start); end.setDate(end.getDate()+6);
+    return dt>=start && dt<=end;
+  }
+  function normalizeDate(input){
+    if(!input) return todayStr();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+    const m=input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if(!m) return todayStr();
+    let mm=m[1],dd=m[2],yy=m[3];
+    if(yy.length===2) yy=(parseInt(yy,10)<50?'20':'19')+yy;
+    return String(yy).padStart(4,'0')+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+  }
   function uid(){ return String(Date.now())+Math.random().toString(36).slice(2); }
   function readLS(k,f){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} }
   function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 
+  // Keep per-ton fallback rates for materials that aren’t in the master sheet
   const PRICE_PER_TON = {"Crush & Run":60,"#57 Stone":70,"Clean Sand":65,"Top Soil":60,"#4 Stone":70,"Sand Clay":null,"Fill Dirt":null};
 
+  // ---------- app state ----------
   let hubs = readLS('dt_hubs', ['Sample & Son, Evans, GA','4567 Chamberlain Ferry Rd, Lincolnton, GA 30817']);
   let selectedHub = readLS('dt_selected_hub', hubs[0]);
   let jobs = readLS('dt_jobs', []);
   let tab = 'today';
 
+  // ---------- elements ----------
   const hubSelect = document.getElementById('hubSelect');
-  const newHub = document.getElementById('newHub');
-  const addHubBtn = document.getElementById('addHubBtn');
-
   const dateI = document.getElementById('date');
   const timeI = document.getElementById('time');
   const customerI = document.getElementById('customer');
@@ -174,27 +153,43 @@ Leonard Gibson
   const priceI = document.getElementById('price');
   const statusI = document.getElementById('status');
   const autoNote = document.getElementById('autoNote');
-
   const list = document.getElementById('list');
-  const pasteBox = document.getElementById('pasteBox');
-  const pasteBtn = document.getElementById('pasteBtn');
-  const clearPaste = document.getElementById('clearPaste');
   const addJobBtn = document.getElementById('addJobBtn');
   const exportBtn = document.getElementById('exportBtn');
   const importInput = document.getElementById('importInput');
 
-  window.addEventListener('load', () => { setTimeout(() => document.getElementById('splash').classList.add('hide'), 400); });
+  window.addEventListener('load', () => {
+    setTimeout(() => document.getElementById('splash').classList.add('hide'), 400);
+  });
 
-  function renderHubs(){ hubSelect.innerHTML=''; hubs.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; hubSelect.appendChild(o); }); hubSelect.value = selectedHub; }
-
-  function calcPrice(){
-    const mat = materialI.value; const tons = parseFloat(loadSizeI.value || '0'); const per = PRICE_PER_TON[mat];
-    if(!mat || !tons){ priceI.value=''; autoNote.textContent=''; return; }
-    if(per==null){ priceI.value=''; autoNote.textContent='Set price manually for '+mat+' (no rate yet).'; return; }
-    const price = Math.round(per * tons * 100)/100; priceI.value = String(price);
-    autoNote.textContent = mat+' @ $'+per+'/ton × '+tons+' tons';
+  function renderHubs(){
+    hubSelect.innerHTML='';
+    hubs.forEach(h=>{
+      const o=document.createElement('option');
+      o.value=h; o.textContent=h; hubSelect.appendChild(o);
+    });
+    hubSelect.value = selectedHub;
   }
-  materialI.onchange = calcPrice; loadSizeI.onchange = calcPrice;
+
+  // If Zone picker already filled a price, don't override it here
+  function calcPrice(){
+    const mat = materialI.value;
+    const tons = parseFloat(loadSizeI.value || '0');
+
+    if (priceI.value) { // already set by master sheet via Zone picker
+      autoNote.textContent = `Price from master sheet${tons?` • ${tons} tons`:''}`;
+      return;
+    }
+
+    const per = PRICE_PER_TON[mat];
+    if(!mat || !tons){ priceI.value=''; autoNote.textContent=''; return; }
+    if(per==null){ priceI.value=''; autoNote.textContent='Set price manually (no rate yet).'; return; }
+    const price = Math.round(per * tons * 100)/100;
+    priceI.value = String(price);
+    autoNote.textContent = `${mat} @ $${per}/ton × ${tons} tons`;
+  }
+  materialI.onchange = calcPrice;
+  loadSizeI.onchange = calcPrice;
 
   function filteredJobs(){
     if(tab==='today') return jobs.filter(j => j.date === todayStr() && j.status!=='Complete' && j.status!=='Canceled');
@@ -204,7 +199,7 @@ Leonard Gibson
   }
 
   function openAppleMaps(hub,addr){
-    const url = 'http://maps.apple.com/?saddr='+encodeURIComponent(hub)+'&daddr='+encodeURIComponent(addr);
+    const url = 'https://maps.apple.com/?saddr='+encodeURIComponent(hub)+'&daddr='+encodeURIComponent(addr);
     window.open(url, '_blank');
   }
 
@@ -254,14 +249,10 @@ Leonard Gibson
     };
   });
 
-  addHubBtn.onclick=()=>{
-    const val = newHub.value.trim(); if(!val) return;
-    if(!hubs.includes(val)) hubs.push(val);
-    selectedHub = val; newHub.value=''; renderHubs(); saveHubs(); saveSelectedHub();
-  };
   hubSelect.onchange=()=>{ selectedHub = hubSelect.value; saveSelectedHub(); };
 
   addJobBtn.onclick=()=>{
+    // Keep whatever price is already in #price (prefer master sheet via Zone picker)
     calcPrice();
     const tons = loadSizeI.value ? parseFloat(loadSizeI.value) : null;
     const job={
@@ -281,507 +272,60 @@ Leonard Gibson
     renderList();
   };
 
-  function parseBlocks(text){
-    const blocks = text.split(/\n\s*\n+/).map(b=>b.trim()).filter(Boolean);
-    const out = []; const mats = Object.keys(PRICE_PER_TON);
-    for(const b of blocks){
-      const lines = b.split(/\n+/).map(x=>x.trim()).filter(Boolean);
-      let name='', addr='', mat='', tons=null;
-      for(const ln of lines){
-        const low = ln.toLowerCase();
-        for(const m of mats){ if(low.includes(m.toLowerCase())) { mat = m; break; } }
-        const tm = low.match(/(\d+(?:\.\d+)?)\s*(?:t|tons?)/); if(tm) tons = parseFloat(tm[1]);
-        if(!addr && /\d+/.test(ln) && /(st|rd|ave|hwy|highway|drive|dr|road|rd\.|ga|georgia|street|lane|ln|way|blvd|circle|ct|court|place|pkwy|parkway)/i.test(ln)){ addr = ln; }
-      }
-      if(!name){
-        for(const ln of lines){
-          if(ln===addr) continue;
-          if(mats.some(m=>ln.toLowerCase().includes(m.toLowerCase()))) continue;
-          name = ln; break;
-        }
-      }
-      if(addr){ out.push({customer:name||'', address:addr, material:mat||'', loadSize:tons||'', price:''}); }
-    }
-    return out;
-  }
-
-  pasteBtn.onclick=()=>{
-    const text = pasteBox.value; const rows = parseBlocks(text); if(!rows.length) return;
-    for(const r of rows){
-      let autoPrice = '';
-      if(r.material && r.loadSize && PRICE_PER_TON.hasOwnProperty(r.material) && PRICE_PER_TON[r.material]!=null){
-        autoPrice = String(Math.round(PRICE_PER_TON[r.material]*parseFloat(r.loadSize)*100)/100);
-      }
-      jobs.push({ id: uid(), date: todayStr(), time: '', customer: r.customer||'', address: r.address||'', material: r.material||'', loadSize: r.loadSize||'', price: autoPrice, status: 'Scheduled' });
-    }
-    saveJobs(); pasteBox.value=''; renderList();
+  // Export/Import
+  exportBtn.onclick = () => {
+    const data = JSON.stringify({ hubs, selectedHub, jobs }, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `dump-trailer-${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
-  clearPaste.onclick=()=>{ pasteBox.value=''; };
+  importInput.onchange = async () => {
+    const f = importInput.files[0]; if(!f) return;
+    const text = await f.text();
+    try {
+      const obj = JSON.parse(text);
+      if(Array.isArray(obj.hubs)) hubs = obj.hubs;
+      if(obj.selectedHub) selectedHub = obj.selectedHub;
+      if(Array.isArray(obj.jobs)) jobs = obj.jobs;
+      saveHubs(); saveSelectedHub(); saveJobs();
+      renderHubs(); renderList();
+    } catch(e) { alert('Import failed: invalid JSON'); }
+    importInput.value = '';
+  };
 
-  renderHubs(); document.getElementById('date').value = todayStr(); renderList();
+  // init
+  renderHubs();
+  dateI.value = todayStr();
+  renderList();
 </script>
-  <!-- Admin / Pricing floating button -->
-<a href="./admin.html" style="
-  position:fixed; right:16px; bottom:16px; z-index:9999;
-  display:inline-block; padding:10px 14px; border-radius:12px;
-  background:#3b82f6; color:#fff; text-decoration:none; font-weight:600;
-  box-shadow:0 6px 20px rgba(0,0,0,.3);
-">
-  Admin / Pricing
-</a>
-<!-- === Quick Quote (Zone tabs) — drop-in widget === -->
-<div id="zone-quote-widget"></div>
 
-<script>
-(function () {
-  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
-
-  // Fallback defaults in case you haven't opened admin.html yet on this device
-  const defaults = {
-    zones: [
-      { id: "zone1", label: "Zone 1 (Local)" },
-      { id: "zone2", label: "Zone 2 (Extended)" },
-    ],
-    materials: [
-      { id: "fill_dirt", label: "Fill Dirt", unit: "yard",
-        minEnabled: false, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
-                       zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
-      { id: "crush_and_run", label: "Crush & Run", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] } },
-      { id: "no57", label: "#57 Stone", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] } },
-      { id: "no4", label: "#4 Stone", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200}] } },
-    ],
-    bannerNote: "Driveway-safe delivery · Max 4 yards per load (where noted).",
-    businessName: "JE Hauling • 706.589.0657"
-  };
-
-  const master = (() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }
-    catch { return defaults; }
-  })();
-
-  const root = document.getElementById("zone-quote-widget");
-  if (!root) return;
-
-  // --- Styles (scoped) ---
-  const style = document.createElement("style");
-  style.textContent = `
-    #zone-quote-widget { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .zqw-card { max-width: 720px; margin: 12px auto; padding: 14px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
-    .zqw-title { font-weight: 700; font-size: 18px; margin-bottom: 10px; }
-    .zqw-tabs { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-    .zqw-tab { padding:8px 12px; border-radius: 999px; border:1px solid #d1d5db; background:#f3f4f6; cursor:pointer; font-weight:600; }
-    .zqw-tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
-    .zqw-row { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
-    .zqw-row > div { display:flex; flex-direction:column; gap:6px; }
-    .zqw-label { font-size:12px; color:#6b7280; }
-    .zqw-select, .zqw-input { padding:10px 12px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
-    .zqw-total { margin-top:12px; padding:12px; border-radius:12px; background:#f9fafb; border:1px solid #e5e7eb; }
-    .zqw-total .num { font-weight:800; font-size:28px; }
-    .zqw-sub { font-size:12px; color:#6b7280; margin-top:4px; }
-    .zqw-btn { margin-top:10px; display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:1px solid #2563eb; background:#2563eb; color:#fff; cursor:pointer; font-weight:700; }
-    .zqw-copy { font-size:12px; color:#6b7280; margin-top:6px; overflow:auto; white-space:nowrap; }
-    @media (max-width:720px){ .zqw-row { grid-template-columns: 1fr; } .zqw-card{ margin: 12px } }
-  `;
-  document.head.appendChild(style);
-
-  // --- Helpers ---
-  const el = (tag, attrs = {}, ...kids) => {
-    const n = document.createElement(tag);
-    Object.entries(attrs).forEach(([k,v]) => k==="class" ? (n.className = v) : k==="text" ? (n.textContent = v) : n.setAttribute(k,v));
-    kids.flat().forEach(k => n.appendChild(typeof k === "string" ? document.createTextNode(k) : k));
-    return n;
-  };
-  const priceFor = (material, zoneId, qty) => {
-    const tiers = material.tiersByZone[zoneId] || [];
-    const t = tiers.find(tt => Number(tt.qty) === Number(qty));
-    if (!t) return { base: 0, total: 0, note: "Qty not in tier table" };
-    const base = Number(t.price || 0);
-    const total = material.minEnabled ? Math.max(base, Number(material.minimum || 0)) : base;
-    return { base, total };
-  };
-
-  // --- State ---
-  let zoneId = (master.zones[0] && master.zones[0].id) || "zone1";
-  let materialId = (master.materials[0] && master.materials[0].id) || "";
-  let qty = 1;
-
-  // --- UI ---
-  const card = el("div", { class: "zqw-card" });
-
-  const title = el("div", { class: "zqw-title", text: "Quick Quote" });
-
-<!-- === Quick Quote (Zone tabs) — drop-in widget === -->
-<div id="zone-quote-widget"></div>
-
-<script>
-(function () {
-  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
-  const defaults = {
-    zones: [
-      { id: "zone1", label: "Zone 1 (Local)" },
-      { id: "zone2", label: "Zone 2 (Extended)" },
-    ],
-    materials: [
-      { id: "fill_dirt", label: "Fill Dirt", unit: "yard",
-        minEnabled: false, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
-                       zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
-      { id: "crush_and_run", label: "Crush & Run", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] } },
-      { id: "no57", label: "#57 Stone", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] } },
-      { id: "no4", label: "#4 Stone", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200}] } },
-    ],
-    bannerNote: "Driveway-safe delivery · Max 4 yards per load (where noted).",
-    businessName: "JE Hauling • 706.589.0657"
-  };
-
-  const master = (() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }
-    catch { return defaults; }
-  })();
-
-  const root = document.getElementById("zone-quote-widget");
-  if (!root) return;
-
-  const style = document.createElement("style");
-  style.textContent = `
-    #zone-quote-widget { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .zqw-card { max-width: 720px; margin: 12px auto; padding: 14px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
-    .zqw-title { font-weight: 700; font-size: 18px; margin-bottom: 10px; }
-    .zqw-tabs { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-    .zqw-tab { padding:8px 12px; border-radius: 999px; border:1px solid #d1d5db; background:#f3f4f6; cursor:pointer; font-weight:600; }
-    .zqw-tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
-    .zqw-row { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
-    .zqw-row > div { display:flex; flex-direction:column; gap:6px; }
-    .zqw-label { font-size:12px; color:#6b7280; }
-    .zqw-select, .zqw-input { padding:10px 12px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
-    .zqw-total { margin-top:12px; padding:12px; border-radius:12px; background:#f9fafb; border:1px solid #e5e7eb; }
-    .zqw-total .num { font-weight:800; font-size:28px; }
-    .zqw-sub { font-size:12px; color:#6b7280; margin-top:4px; }
-    .zqw-btn { margin-top:10px; display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:1px solid #2563eb; background:#2563eb; color:#fff; cursor:pointer; font-weight:700; }
-    .zqw-copy { font-size:12px; color:#6b7280; margin-top:6px; overflow:auto; white-space:nowrap; }
-    @media (max-width:720px){ .zqw-row { grid-template-columns: 1fr; } .zqw-card{ margin: 12px } }
-  `;
-  document.head.appendChild(style);
-
-  const el = (tag, attrs = {}, ...kids) => {
-    const n = document.createElement(tag);
-    Object.entries(attrs).forEach(([k,v]) => k==="class" ? (n.className = v) : k==="text" ? (n.textContent = v) : n.setAttribute(k,v));
-    kids.flat().forEach(k => n.appendChild(typeof k === "string" ? document.createTextNode(k) : k));
-    return n;
-  };
-  const priceFor = (material, zoneId, qty) => {
-    const tiers = material.tiersByZone[zoneId] || [];
-    const t = tiers.find(tt => Number(tt.qty) === Number(qty));
-    if (!t) return { base: 0, total: 0, note: "Qty not in tier table" };
-    const base = Number(t.price || 0);
-    const total = material.minEnabled ? Math.max(base, Number(material.minimum || 0)) : base;
-    return { base, total };
-  };
-
-  let zoneId = (master.zones[0] && master.zones[0].id) || "zone1";
-  let materialId = (master.materials[0] && master.materials[0].id) || "";
-  let qty = 1;
-
-  const card = el("div", { class: "zqw-card" });
-  const title = el("div", { class: "zqw-title", text: "Quick Quote" });
-
-  const tabs = el("div", { class: "zqw-tabs" });
-  const makeTabs = () => {
-    tabs.innerHTML = "";
-    master.zones.forEach(z => {
-      const b = el("button", { class: "zqw-tab" + (z.id === zoneId ? " active" : "") }, z.label);
-      b.onclick = () => { zoneId = z.id; makeTabs(); updateTotal(); };
-      tabs.appendChild(b);
-    });
-  };
-
-  const row = el("div", { class: "zqw-row" });
-  const matBox = el("div", {},
-    el("div", { class: "zqw-label", text: "Material" }),
-    (() => {
-      const s = el("select", { class: "zqw-select" });
-      master.materials.forEach(m => s.appendChild(el("option", { value: m.id, text: m.label })));
-      s.onchange = () => { materialId = s.value; updateTotal(); };
-      materialId && (s.value = materialId);
-      return s;
-    })()
-  );
-  const qtyBox = el("div", {},
-    el("div", { class: "zqw-label", text: "Quantity" }),
-    (() => {
-      const s = el("select", { class: "zqw-select" });
-      [1,2,3,4].forEach(n => s.appendChild(el("option", { value: String(n), text: String(n) })));
-      s.onchange = () => { qty = Number(s.value); updateTotal(); };
-      return s;
-    })()
-  );
-  const noteBox = el("div", {},
-    el("div", { class: "zqw-label", text: "Note" }),
-    el("div", { class: "zqw-sub", text: master.bannerNote || " " })
-  );
-  row.appendChild(matBox); row.appendChild(qtyBox); row.appendChild(noteBox);
-
-  const totalWrap = el("div", { class: "zqw-total" },
-    el("div", { class: "zqw-label", text: "Quoted Total" }),
-    el("div", { class: "num", id: "zqw-num" }, "—"),
-    el("div", { class: "zqw-sub", id: "zqw-sub" }, "")
-  );
-
-  const copyBtn = el("button", { class: "zqw-btn" }, "Copy to Messenger");
-  const copyLine = el("div", { class: "zqw-copy", id: "zqw-copy" });
-
-  copyBtn.onclick = async () => {
-    const m = master.materials.find(mm => mm.id === materialId);
-    const z = master.zones.find(zz => zz.id === zoneId);
-    if (!m || !z) return;
-    const { total, base } = priceFor(m, zoneId, qty);
-    const unit = m.unit === "yard" ? "yard" : "ton";
-    const line = `${m.label} — ${qty} ${unit}${qty>1?"s":""} · ${z.label} · $${total} — ${master.businessName || ""}`.trim();
-    try { await navigator.clipboard.writeText(line); alert("Copied to clipboard!"); }
-    catch {
-      const ta = document.createElement("textarea"); ta.value = line;
-      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-      alert("Copied to clipboard!");
-    }
-  };
-
-  const updateTotal = () => {
-    const num = card.querySelector("#zqw-num");
-    const sub = card.querySelector("#zqw-sub");
-    const cpy = card.querySelector("#zqw-copy");
-    const m = master.materials.find(mm => mm.id === materialId);
-    const z = master.zones.find(zz => zz.id === zoneId);
-    if (!m || !z) { num.textContent = "—"; sub.textContent = ""; cpy.textContent = ""; return; }
-    const { total, base } = priceFor(m, zoneId, qty);
-    num.textContent = total ? `$${total.toFixed(0)}` : "—";
-    sub.textContent = total ? `Base tier: $${base.toFixed(0)}${m.minEnabled ? ` · Min applied: $${(m.minimum||0)}` : ""}` : "Select a valid qty for this material/zone";
-    const unit = m.unit === "yard" ? "yard" : "ton";
-    cpy.textContent = `${m.label} — ${qty} ${unit}${qty>1?"s":""} · ${z.label} · $${total} — ${master.businessName || ""}`;
-  };
-
-  makeTabs();
-  const card = document.createElement("div");
-  card.className = "zqw-card";
-  card.appendChild(title);
-  card.appendChild(tabs);
-  card.appendChild(row);
-  card.appendChild(totalWrap);
-  card.appendChild(copyBtn);
-  card.appendChild(copyLine);
-  root.appendChild(card);
-
-  updateTotal();
-})();
-</script>
-<!-- === /Quick Quote (Zone tabs) === -->
-
-<!-- === Quick Quote (Zone tabs) — corrected === -->
-<div id="zone-quote-widget"></div>
-<script>
-(function () {
-  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
-  const defaults = {
-    zones: [
-      { id: "zone1", label: "Zone 1 (Local)" },
-      { id: "zone2", label: "Zone 2 (Extended)" },
-    ],
-    materials: [
-      { id: "fill_dirt", label: "Fill Dirt", unit: "yard",
-        minEnabled: false, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
-                       zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
-      { id: "crush_and_run", label: "Crush & Run", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] } },
-      { id: "no57", label: "#57 Stone", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] } },
-      { id: "no4", label: "#4 Stone", unit: "ton",
-        minEnabled: true, minimum: 100,
-        tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140}],
-                       zone2:[{qty:1,price:100},{qty:2,price:200}] } },
-    ],
-    bannerNote: "Driveway-safe delivery · Max 4 yards per load (where noted).",
-    businessName: "JE Hauling • 706.589.0657"
-  };
-
-  const master = (() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }
-    catch { return defaults; }
-  })();
-
-  const root = document.getElementById("zone-quote-widget");
-  if (!root) return;
-
-  const style = document.createElement("style");
-  style.textContent = `
-    #zone-quote-widget { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .zqw-card { max-width: 720px; margin: 12px auto; padding: 14px; border-radius: 14px; border: 1px solid #e5e7eb; background: #fff; color: #111; }
-    .zqw-title { font-weight: 700; font-size: 18px; margin-bottom: 10px; }
-    .zqw-tabs { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-    .zqw-tab { padding:8px 12px; border-radius: 999px; border:1px solid #d1d5db; background:#f3f4f6; cursor:pointer; font-weight:600; }
-    .zqw-tab.active { background:#2563eb; color:#fff; border-color:#2563eb; }
-    .zqw-row { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
-    .zqw-row > div { display:flex; flex-direction:column; gap:6px; }
-    .zqw-label { font-size:12px; color:#6b7280; }
-    .zqw-select { padding:10px 12px; border-radius:10px; border:1px solid #d1d5db; background:#fff; }
-    .zqw-total { margin-top:12px; padding:12px; border-radius:12px; background:#f9fafb; border:1px solid #e5e7eb; }
-    .zqw-total .num { font-weight:800; font-size:28px; }
-    .zqw-sub { font-size:12px; color:#6b7280; margin-top:4px; }
-    .zqw-btn { margin-top:10px; display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; border:1px solid #2563eb; background:#2563eb; color:#fff; cursor:pointer; font-weight:700; }
-    .zqw-copy { font-size:12px; color:#6b7280; margin-top:6px; overflow:auto; white-space:nowrap; }
-    @media (max-width:720px){ .zqw-row { grid-template-columns: 1fr; } .zqw-card{ margin: 12px } }
-  `;
-  document.head.appendChild(style);
-
-  // helpers
-  const el = (tag, attrs = {}, ...kids) => {
-    const n = document.createElement(tag);
-    Object.entries(attrs).forEach(([k,v]) => k==="class" ? (n.className = v) : k==="text" ? (n.textContent = v) : n.setAttribute(k,v));
-    kids.flat().forEach(k => n.appendChild(typeof k === "string" ? document.createTextNode(k) : k));
-    return n;
-  };
-  const priceFor = (material, zoneId, qty) => {
-    const tiers = material.tiersByZone[zoneId] || [];
-    const t = tiers.find(tt => Number(tt.qty) === Number(qty));
-    if (!t) return { base: 0, total: 0, note: "Qty not in tier table" };
-    const base = Number(t.price || 0);
-    const total = material.minEnabled ? Math.max(base, Number(material.minimum || 0)) : base;
-    return { base, total };
-  };
-
-  // state
-  let zoneId = (master.zones[0] && master.zones[0].id) || "zone1";
-  let materialId = (master.materials[0] && master.materials[0].id) || "";
-  let qty = 1;
-
-  // UI
-  const card = el("div", { class: "zqw-card" });
-  const title = el("div", { class: "zqw-title", text: "Quick Quote" });
-
-  const tabs = el("div", { class: "zqw-tabs" });
-  const makeTabs = () => {
-    tabs.innerHTML = "";
-    master.zones.forEach(z => {
-      const b = el("button", { class: "zqw-tab" + (z.id === zoneId ? " active" : ""), type:"button" }, z.label);
-      b.onclick = () => { zoneId = z.id; makeTabs(); updateTotal(); };
-      tabs.appendChild(b);
-    });
-  };
-
-  const row = el("div", { class: "zqw-row" });
-  const matSel = el("select", { class: "zqw-select" });
-  master.materials.forEach(m => matSel.appendChild(el("option", { value: m.id, text: m.label })));
-  matSel.onchange = () => { materialId = matSel.value; updateTotal(); };
-
-  const qtySel = el("select", { class: "zqw-select" });
-  [1,2,3,4].forEach(n => qtySel.appendChild(el("option", { value: String(n), text: String(n) })));
-  qtySel.onchange = () => { qty = Number(qtySel.value); updateTotal(); };
-
-  row.appendChild(el("div", {}, el("div", { class: "zqw-label", text: "Material" }), matSel));
-  row.appendChild(el("div", {}, el("div", { class: "zqw-label", text: "Quantity" }), qtySel));
-  row.appendChild(el("div", {}, el("div", { class: "zqw-label", text: "Note" }), el("div", { class: "zqw-sub", text: master.bannerNote || " " })));
-
-  const totalWrap = el("div", { class: "zqw-total" },
-    el("div", { class: "zqw-label", text: "Quoted Total" }),
-    el("div", { class: "num", id: "zqw-num" }, "—"),
-    el("div", { class: "zqw-sub", id: "zqw-sub" }, "")
-  );
-
-  const copyBtn = el("button", { class: "zqw-btn", type:"button" }, "Copy to Messenger");
-  const copyLine = el("div", { class: "zqw-copy", id: "zqw-copy" });
-
-  copyBtn.onclick = async () => {
-    const m = master.materials.find(mm => mm.id === materialId);
-    const z = master.zones.find(zz => zz.id === zoneId);
-    if (!m || !z) return;
-    const { total, base } = priceFor(m, zoneId, qty);
-    const unit = m.unit === "yard" ? "yard" : "ton";
-    const line = `${m.label} — ${qty} ${unit}${qty>1?"s":""} · ${z.label} · $${total} — ${master.businessName || ""}`.trim();
-    try { await navigator.clipboard.writeText(line); alert("Copied to clipboard!"); }
-    catch {
-      const ta = document.createElement("textarea"); ta.value = line;
-      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-      alert("Copied to clipboard!");
-    }
-  };
-
-  const updateTotal = () => {
-    const num = card.querySelector("#zqw-num");
-    const sub = card.querySelector("#zqw-sub");
-    const cpy = card.querySelector("#zqw-copy");
-    const m = master.materials.find(mm => mm.id === materialId);
-    const z = master.zones.find(zz => zz.id === zoneId);
-    if (!m || !z) { num.textContent = "—"; sub.textContent = ""; cpy.textContent = ""; return; }
-    const { total, base } = priceFor(m, zoneId, qty);
-    num.textContent = total ? `$${total.toFixed(0)}` : "—";
-    sub.textContent = total ? `Base tier: $${base.toFixed(0)}${m.minEnabled ? ` · Min applied: $${(m.minimum||0)}` : ""}` : "Select a valid qty for this material/zone";
-    const unit = m.unit === "yard" ? "yard" : "ton";
-    cpy.textContent = `${m.label} — ${qty} ${unit}${qty>1?"s":""} · ${z.label} · $${total} — ${master.businessName || ""}`;
-  };
-
-  // assemble
-  makeTabs();
-  card.appendChild(title);
-  card.appendChild(tabs);
-  card.appendChild(row);
-  card.appendChild(totalWrap);
-  card.appendChild(copyBtn);
-  card.appendChild(copyLine);
-  root.appendChild(card);
-
-  // initial render
-  updateTotal();
-})();
-</script>
-<!-- === /Quick Quote (Zone tabs) — corrected === -->
-<!-- === Floating Zone picker + price wiring (drop-in) === -->
+<!-- Floating Zone picker + price wiring (safe-area + remembers last zone) -->
 <style>
-  .zone-fab {
-    position: fixed; right: 16px; bottom: 16px; z-index: 9999;
-    display: flex; align-items: center; gap: 8px;
-    background: #111827; color: #fff; padding: 10px 12px; border-radius: 12px;
-    box-shadow: 0 6px 20px rgba(0,0,0,.35); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  .zone-fab{
+    position:fixed;
+    right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    z-index:9999;
+    display:flex;align-items:center;gap:8px;
+    background:#111827;color:#fff;padding:10px 12px;border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,.35);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif
   }
-  .zone-fab button {
-    border: 1px solid #374151; background: #1f2937; color: #fff; padding: 6px 10px; border-radius: 999px; font-weight: 700; cursor: pointer;
-  }
-  .zone-fab button.active { background: #2563eb; border-color: #2563eb; }
-  .zone-chip { font-size: 13px; margin-top: 6px; color: #111; }
+  .zone-fab button{border:1px solid #374151;background:#1f2937;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700;cursor:pointer}
+  .zone-fab button.active{background:#2563eb;border-color:#2563eb}
+  .zone-chip{font-size:13px;margin-top:6px;color:#111}
 </style>
-
 <div class="zone-fab" id="zoneFab">
   <span style="font-weight:600;opacity:.9">Zone</span>
-  <button type="button" data-zone="zone1" class="active">1</button>
+  <button type="button" data-zone="zone1">1</button>
   <button type="button" data-zone="zone2">2</button>
 </div>
-
 <script>
 (function(){
   const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
-
-  // Load master pricing from Admin page (falls back to safe defaults)
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
   const defaults = {
     zones:[{id:"zone1",label:"Zone 1 (Local)"},{id:"zone2",label:"Zone 2 (Extended)"}],
     materials:[
@@ -801,58 +345,18 @@ Leonard Gibson
   };
   const master = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }catch{ return defaults; } })();
 
-  // Heuristics to find your existing controls on the page
-  function findMaterialSelect(){
-    for (const s of document.querySelectorAll('select')) {
-      const opts = [...s.options].map(o=>o.textContent.trim().toLowerCase());
-      if (opts.includes('crush & run') && (opts.includes('#57 stone') || opts.includes('fill dirt'))) return s;
-    }
-    return null;
-  }
-  function findQtySelect(){
-    // looks for options like "1 ton", "2 tons", etc.
-    for (const s of document.querySelectorAll('select')) {
-      const hasTon = [...s.options].some(o => /\bton(s)?\b/i.test(o.textContent));
-      if (hasTon) return s;
-    }
-    return null;
-  }
-  function findPriceInput(){
-    // try placeholder or name containing "price"
-    for (const el of document.querySelectorAll('input,textarea')) {
-      const ph=(el.getAttribute('placeholder')||'').toLowerCase();
-      const nm=(el.getAttribute('name')||'').toLowerCase();
-      if (ph.includes('price') || nm.includes('price')) return el;
-    }
-    // try label "Price"
-    for (const lab of document.querySelectorAll('label')) {
-      if (lab.textContent.toLowerCase().includes('price')) {
-        const id=lab.getAttribute('for'); if (id){ const t=document.getElementById(id); if (t) return t; }
-      }
-    }
-    return null;
-  }
-
-  const matSel = findMaterialSelect();
-  const qtySel = findQtySelect();
-  const priceEl = findPriceInput();
-
-  // if we can't find material or qty, quietly stop (nothing breaks your page)
-  if (!matSel || !qtySel) return;
-
-  // Create a little text chip under the price as a visual confirmation
-  const chip = document.createElement('div');
-  chip.className = 'zone-chip';
+  // find selects/inputs on the main form
+  const matSel = document.getElementById('material');
+  const qtySel = document.getElementById('loadSize');
+  const priceEl = document.getElementById('price');
+  const chip = document.createElement('div'); chip.className='zone-chip';
   (priceEl?.parentElement || qtySel.parentElement || matSel.parentElement).appendChild(chip);
 
-  // Price math from the master sheet
   function materialByLabel(label){
     return (master.materials||[]).find(m => (m.label||'').toLowerCase() === (label||'').toLowerCase());
   }
   function qtyNumber(){
-    const t = String(qtySel.value||'');
-    const m = t.match(/\d+/);
-    return m ? Number(m[0]) : Number(t)||1;
+    const t = String(qtySel.value||''); const m = t.match(/\d+/); return m ? Number(m[0]) : Number(t)||1;
   }
   function priceFor(material, zoneId, qty){
     const tiers = material?.tiersByZone?.[zoneId] || [];
@@ -863,9 +367,9 @@ Leonard Gibson
     return { base, total };
   }
 
-  // Zone picker logic
-  let zoneId = master.zones?.[0]?.id || 'zone1';
+  // Zone picker logic + memory
   const fab = document.getElementById('zoneFab');
+  let zoneId = localStorage.getItem(ZONE_KEY) || (master.zones?.[0]?.id || 'zone1');
   function paintZoneButtons(){
     fab.querySelectorAll('button[data-zone]').forEach(b=>{
       b.classList.toggle('active', b.dataset.zone===zoneId);
@@ -875,142 +379,79 @@ Leonard Gibson
     const btn = e.target.closest('button[data-zone]');
     if (!btn) return;
     zoneId = btn.dataset.zone;
+    localStorage.setItem(ZONE_KEY, zoneId);
     paintZoneButtons();
     updatePrice();
   });
   paintZoneButtons();
 
-  // Update when material/qty changes
-  matSel.addEventListener('change', updatePrice);
-  qtySel.addEventListener('change', updatePrice);
-
   function updatePrice(){
     const matLabel = matSel.options[matSel.selectedIndex]?.text?.trim();
     const mat = materialByLabel(matLabel);
     const qty = qtyNumber();
-
-    if (!mat) { chip.textContent='Select a material'; return; }
+    if (!mat) {
+      chip.textContent = 'No master price for this material';
+      return;
+    }
     const p = priceFor(mat, zoneId, qty);
-    if (!p) { chip.textContent='No price set for this qty / zone'; return; }
-
+    if (!p) { chip.textContent='No price set for this qty/zone'; return; }
     chip.textContent = `Price (from master, ${zoneId === 'zone2' ? 'Zone 2' : 'Zone 1'}): $${p.total.toFixed(0)}`;
-
     if (priceEl) {
-      // Fill your "Price (auto)" field
       priceEl.value = p.total;
-      // Fire events so any other logic on your page reacts
       priceEl.dispatchEvent(new Event('input', {bubbles:true}));
       priceEl.dispatchEvent(new Event('change', {bubbles:true}));
     }
   }
 
+  // Update when material/qty changes
+  matSel.addEventListener('change', updatePrice);
+  qtySel.addEventListener('change', updatePrice);
+
   // initial compute
   updatePrice();
 })();
 </script>
-<!-- === /Floating Zone picker + price wiring === -->
-<style>
-  .zone-fab{
-    position:fixed;
-    right:calc(16px + env(safe-area-inset-right));
-    bottom:calc(16px + env(safe-area-inset-bottom));
-    z-index:9999;
-    display:flex;align-items:center;gap:8px;
-    background:#111827;color:#fff;padding:10px 12px;border-radius:12px;
-    box-shadow:0 6px 20px rgba(0,0,0,.35);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif
-  }
-  .zone-fab button{border:1px solid #374151;background:#1f2937;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700;cursor:pointer}
-  .zone-fab button.active{background:#2563eb;border-color:#2563eb}
-  .zone-chip{font-size:13px;margin-top:6px;color:#111}
-</style>
 <script>
+/* Hide FAB on scroll — drop-in (no other edits needed) */
 (function(){
-  // 1) Find any element that contains the text "Add Hub"
-  const hit = [...document.querySelectorAll('h1,h2,h3,h4,button,a,div,span,p')]
-    .find(n => /(^|\s)add hub(\s|$)/i.test(n.textContent || ""));
+  const FAB_ID = 'zoneFab';
+  const PEEK = false;            // set to true to leave a small "peek"
+  const MIN_DELTA = 6;           // how much scroll before hiding (px)
+  const TOP_BUFFER = 10;         // don't hide near very top (px)
+  const BOTTOM_BUFFER = 20;      // don't hide near very bottom (px)
 
-  if (hit) {
-    // 2) Grab its enclosing "card" (best guess), or just use the element itself
-    const card = hit.closest('.card, .box, .tile, section, article, div') || hit;
+  const fab = document.getElementById(FAB_ID);
+  if (!fab) return;
 
-    // 3) Build a replacement Admin button in a similar wrapper
-    const wrap = document.createElement('div');
-    wrap.className = card.className; // try to keep same styling
-    wrap.style.cssText = wrap.style.cssText || '';
-    wrap.innerHTML = `
-      <div style="font-weight:700;font-size:18px;margin-bottom:8px">Admin</div>
-      <p style="color:#6b7280;margin:0 0 10px">Manage materials, zones, and pricing.</p>
-      <a href="./admin.html" style="
-        display:inline-block;padding:10px 14px;border-radius:10px;
-        background:#3b82f6;color:#fff;text-decoration:none;font-weight:700;
-        border:1px solid #3b82f6">
-        Open Admin / Pricing
-      </a>
-    `;
+  // Inject tiny CSS
+  const style = document.createElement('style');
+  const hiddenRule = PEEK
+    ? 'transform: translateY(60%); opacity:.35;'
+    : 'transform: translateY(calc(100% + 24px)); opacity:0;';
+  style.textContent =
+    `.zone-fab{transition:transform .25s ease,opacity .2s ease;will-change:transform}
+     .zone-fab.is-hidden{${hiddenRule}pointer-events:none}
+     @media (prefers-reduced-motion: reduce){.zone-fab{transition:none}}`;
+  document.head.appendChild(style);
 
-    // 4) Replace the old card/box with the Admin button
-    card.replaceWith(wrap);
+  let lastY = window.scrollY, ticking = false;
+
+  function onScroll(){
+    const y = window.scrollY, dy = y - lastY; lastY = y;
+    const nearTop = y < TOP_BUFFER;
+    const nearBottom = (window.innerHeight + y) > (document.body.offsetHeight - BOTTOM_BUFFER);
+    const shouldHide = dy > MIN_DELTA && !nearTop && !nearBottom;
+    fab.classList.toggle('is-hidden', shouldHide);
+    ticking = false;
   }
 
-  // 5) If a floating Admin button exists, remove it (we replaced the box with a native button now)
-  const floating = document.getElementById('adminFab');
-  if (floating) floating.remove();
-})();
-</script>
-<script>
-(function(){
-  // Find a heading/button/label that says "Add Hub"
-  const hit = [...document.querySelectorAll('h1,h2,h3,h4,button,a,div,span,p')]
-    .find(n => /(^|\s)add hub(\s|$)/i.test((n.textContent||"").trim()));
-  if (!hit) return;
+  window.addEventListener('scroll', () => {
+    if (!ticking){ requestAnimationFrame(onScroll); ticking = true; }
+  }, {passive:true});
 
-  // Use its enclosing "card" container or itself
-  const card = hit.closest('.card, .box, .tile, section, article, div') || hit;
-
-  // Build Admin button
-  const wrap = document.createElement('div');
-  wrap.style.border = '1px solid #e5e7eb';
-  wrap.style.borderRadius = '14px';
-  wrap.style.padding = '14px';
-  wrap.style.background = '#fff';
-  wrap.innerHTML = `
-    <div style="font-weight:700;font-size:18px;margin-bottom:8px">Admin</div>
-    <p style="color:#6b7280;margin:0 0 10px">Manage materials, zones, and pricing.</p>
-    <a href="./admin.html" style="
-      display:inline-block;padding:10px 14px;border-radius:10px;
-      background:#3b82f6;color:#fff;text-decoration:none;font-weight:700;
-      border:1px solid #3b82f6">
-      Open Admin / Pricing
-    </a>
-  `;
-
-  // Replace the old card
-  card.replaceWith(wrap);
-})();
-</script>
-<script>
-(function(){
-  // 1) Remove the visible Paste box card if it exists
-  const pb = document.getElementById('pasteBox');
-  if (pb) {
-    // Try to remove its outer card container
-    const card =
-      pb.closest('.bg-white.rounded-2xl.shadow.p-3.mb-3') ||
-      pb.closest('.bg-white') ||
-      pb.closest('div');
-    if (card) card.remove();
-  }
-
-  // 2) Make sure code that references these IDs never crashes
-  ['pasteBox','pasteBtn','clearPaste'].forEach(id => {
-    if (!document.getElementById(id)) {
-      const el = id === 'pasteBox' ? document.createElement('textarea') : document.createElement('button');
-      el.id = id;
-      if (el.tagName === 'BUTTON') el.type = 'button';
-      el.style.display = 'none';
-      document.body.appendChild(el);
-    }
+  // Any interaction shows it again immediately
+  ['touchstart','mousemove','focusin','click'].forEach(ev=>{
+    window.addEventListener(ev, ()=> fab.classList.remove('is-hidden'), {passive:true});
   });
 })();
 </script>
