@@ -904,6 +904,40 @@ Leonard Gibson
   .zone-fab button.active{background:#2563eb;border-color:#2563eb}
   .zone-chip{font-size:13px;margin-top:6px;color:#111}
 </style>
+<script>
+(function(){
+  // 1) Find any element that contains the text "Add Hub"
+  const hit = [...document.querySelectorAll('h1,h2,h3,h4,button,a,div,span,p')]
+    .find(n => /(^|\s)add hub(\s|$)/i.test(n.textContent || ""));
+
+  if (hit) {
+    // 2) Grab its enclosing "card" (best guess), or just use the element itself
+    const card = hit.closest('.card, .box, .tile, section, article, div') || hit;
+
+    // 3) Build a replacement Admin button in a similar wrapper
+    const wrap = document.createElement('div');
+    wrap.className = card.className; // try to keep same styling
+    wrap.style.cssText = wrap.style.cssText || '';
+    wrap.innerHTML = `
+      <div style="font-weight:700;font-size:18px;margin-bottom:8px">Admin</div>
+      <p style="color:#6b7280;margin:0 0 10px">Manage materials, zones, and pricing.</p>
+      <a href="./admin.html" style="
+        display:inline-block;padding:10px 14px;border-radius:10px;
+        background:#3b82f6;color:#fff;text-decoration:none;font-weight:700;
+        border:1px solid #3b82f6">
+        Open Admin / Pricing
+      </a>
+    `;
+
+    // 4) Replace the old card/box with the Admin button
+    card.replaceWith(wrap);
+  }
+
+  // 5) If a floating Admin button exists, remove it (we replaced the box with a native button now)
+  const floating = document.getElementById('adminFab');
+  if (floating) floating.remove();
+})();
+</script>
 
 </body>
 </html>
