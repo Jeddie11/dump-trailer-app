@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JE Hauling — Admin / Pricing</title>
+  <style>
+    :root { --bg:#0b0b0c; --card:#141416; --muted:#a8adb7; --text:#eef1f6; --accent:#3b82f6; --ring:#2563eb; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:920px;margin:0 auto;padding:16px}
+    h1{font-size:22px;margin:8px 0 12px}
+    h2{font-size:18px;margin:16px 0 8px}
+    .card{background:var(--card);border:1px solid #232428;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 1px 2px rgb(0 0 0 / 0.25)}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type="text"],input[type="number"],textarea,select{width:100%;box-sizing:border-box;background:#0f1012;border:1px solid #2a2b31;color:var(--text);border-radius:10px;padding:10px;font-size:14px;outline:none}
+    input:focus,textarea:focus,select:focus{border-color:var(--ring);box-shadow:0 0 0 2px rgb(37 99 235 / 0.25)}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+    .col-12{grid-column:span 12}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-8{grid-column:span 8}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:#1f2937;border:1px solid #2b3646;color:#e5e7eb;border-radius:12px;padding:10px 12px;cursor:pointer;text-decoration:none}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn.ghost{background:transparent;border-color:#2b2d33}
+    .btn:active{transform:translateY(1px)}
+    .stack{display:flex;gap:8px;flex-wrap:wrap}
+    .muted{color:var(--muted);font-size:12px}
+    .grid{display:grid;gap:8px}
+    .tier{display:flex;gap:8px;align-items:center;background:#0f1012;border:1px solid #23252b;padding:8px;border-radius:12px}
+    .tier input{max-width:110px}
+    .flex{display:flex;gap:8px;align-items:center}
+    .right{margin-left:auto}
+    .quote{font-size:13px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:auto}
+    @media (max-width:700px){.col-6,.col-4,.col-3,.col-8{grid-column:span 12} .quote{white-space:normal}}
+    code{background:#0f1012;border:1px solid #2a2b31;border-radius:8px;padding:2px 6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Master Pricing — Admin</h1>
+    <div class="stack" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="muted">Storage key: <code>HAULING_MASTER_PRICING_V2</code></div>
+      <div class="stack">
+        <button class="btn" id="importBtn">Import JSON</button>
+        <button class="btn primary" id="exportBtn">Export JSON</button>
+        <input type="file" id="fileInput" accept="application/json" hidden>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="col-12">
+          <label>Business name (you can include phone if you want it in copy line)</label>
+          <input id="bizName">
+        </div>
+        <div class="col-12">
+          <label>Delivery included areas</label>
+          <input id="areas">
+        </div>
+        <div class="col-12">
+          <label>Banner note</label>
+          <input id="banner">
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="col-4"><label>Fuel surcharge %</label><input id="feeFuel" type="number"></div>
+        <div class="col-4"><label>Card fee %</label><input id="feeCard" type="number"></div>
+        <div class="col-4"><label>After-hours flat $</label><input id="feeAfter" type="number"></div>
+      </div>
+    </div>
+
+    <h2>Materials</h2>
+    <div id="materials"></div>
+    <div class="stack"><button class="btn" id="addMaterial">+ Add material</button></div>
+
+    <h2>Zones</h2>
+    <div id="zones"></div>
+    <div class="stack"><button class="btn" id="addZone">+ Add zone</button></div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Quick Quote</h2>
+      <div class="row">
+        <div class="col-12"><label>Address (optional, saved on this device)</label><input id="address"></div>
+        <div class="col-12">
+          <div class="stack">
+            <a class="btn ghost" id="openApple" target="_blank" rel="noopener">Open in Apple Maps</a>
+          </div>
+        </div>
+        <div class="col-6">
+          <label>Zone</label>
+          <select id="qqZone"></select>
+        </div>
+        <div class="col-6">
+          <label>Material</label>
+          <select id="qqMaterial"></select>
+        </div>
+        <div class="col-6">
+          <label>Quantity</label>
+          <select id="qqQty">
+            <option>1</option><option>2</option><option>3</option><option>4</option>
+          </select>
+        </div>
+      </div>
+      <div class="card" style="margin:12px 0">
+        <div class="row">
+          <div class="col-12"><div class="muted">Quoted Total</div></div>
+          <div class="col-12"><div id="qqTotal" style="font-weight:700;font-size:28px">—</div></div>
+          <div class="col-12"><div class="muted" id="qqExplain"></div></div>
+        </div>
+      </div>
+      <div class="stack">
+        <button class="btn primary" id="copyBtn">Copy to Messenger</button>
+      </div>
+      <div class="quote" id="copyPreview"></div>
+    </div>
+
+    <div class="card">
+      <div class="muted">Live JSON (read-only)</div>
+      <pre id="live" style="font-size:12px;white-space:pre-wrap"></pre>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
+  const LAST_ADDR_KEY = "HAULING_LAST_ADDRESS";
+
+  const defaultMaster = {
+    version: "2.1.0",
+    businessName: "JE Hauling • 706.589.0657",
+    deliveryIncludedAreas: "Evans, Grovetown, Martinez, Harlem, Lincolnton",
+    bannerNote: "Driveway-safe delivery · Max 4 yards per load (where noted).",
+    zones: [
+      { id: "zone1", label: "Zone 1 (Local)", rangeMiles: "0–25 mi one-way", surchargeType: "none", surchargeValue: 0, description: "Delivery included in price" },
+      { id: "zone2", label: "Zone 2 (Extended)", rangeMiles: "25–45 mi one-way", surchargeType: "none", surchargeValue: 0, description: "Washington, Thomson & beyond" }
+    ],
+    materials: [
+      { id: "fill_dirt", label: "Fill Dirt", unit: "yard", minEnabled: false, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}], zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
+      { id: "crush_and_run", label: "Crush & Run", unit: "ton", minEnabled: true, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}], zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] } },
+      { id: "no57", label: "#57 Stone", unit: "ton", minEnabled: true, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}], zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] } },
+      { id: "no4", label: "#4 Stone", unit: "ton", minEnabled: true, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140}], zone2:[{qty:1,price:100},{qty:2,price:200}] } }
+    ],
+    fees: { fuelSurchargePercent: 0, cardFeePercent: 0, afterHoursFlat: 0 }
+  };
+
+  function loadMaster(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : defaultMaster;
+    }catch{ return defaultMaster; }
+  }
+  function saveMaster(m){ localStorage.setItem(STORAGE_KEY, JSON.stringify(m)); render(); }
+  function qs(id){ return document.getElementById(id); }
+
+  let master = loadMaster();
+
+  // Bind basic fields
+  ["bizName","areas","banner","feeFuel","feeCard","feeAfter"].forEach(()=>{});
+  qs("bizName").value = master.businessName || "";
+  qs("areas").value = master.deliveryIncludedAreas || "";
+  qs("banner").value = master.bannerNote || "";
+  qs("feeFuel").value = master.fees.fuelSurchargePercent ?? 0;
+  qs("feeCard").value = master.fees.cardFeePercent ?? 0;
+  qs("feeAfter").value = master.fees.afterHoursFlat ?? 0;
+
+  ["bizName","areas","banner","feeFuel","feeCard","feeAfter"].forEach(id=>{
+    qs(id).addEventListener("input", ()=>{
+      master.businessName = qs("bizName").value;
+      master.deliveryIncludedAreas = qs("areas").value;
+      master.bannerNote = qs("banner").value;
+      master.fees.fuelSurchargePercent = Number(qs("feeFuel").value||0);
+      master.fees.cardFeePercent = Number(qs("feeCard").value||0);
+      master.fees.afterHoursFlat = Number(qs("feeAfter").value||0);
+      saveMaster(master);
+    });
+  });
+
+  // Materials UI
+  const materialsDiv = qs("materials");
+  function renderMaterials(){
+    materialsDiv.innerHTML = "";
+    master.materials.forEach((mat, idx)=>{
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.innerHTML = `
+        <div class="row">
+          <div class="col-8"><label>Label</label><input value="${mat.label}" data-k="label"></div>
+          <div class="col-4"><label>ID (slug)</label><input value="${mat.id}" data-k="id"></div>
+          <div class="col-4"><label>Unit</label>
+            <select data-k="unit">
+              <option value="yard" ${mat.unit==="yard"?"selected":""}>Yard</option>
+              <option value="ton" ${mat.unit==="ton"?"selected":""}>Ton</option>
+            </select>
+          </div>
+          <div class="col-4"><label>Minimum charge</label><input type="number" value="${mat.minimum??0}" data-k="minimum"></div>
+          <div class="col-4"><label>Enforce minimum?</label>
+            <select data-k="minEnabled"><option value="false" ${!mat.minEnabled?"selected":""}>No</option><option value="true" ${mat.minEnabled?"selected":""}>Yes</option></select>
+          </div>
+          <div class="col-12"><label>Per‑Zone Tiers</label></div>
+          <div class="col-12" id="tiers_${idx}"></div>
+        </div>
+        <div class="stack"><button class="btn ghost" data-action="remove">Delete material</button></div>
+      `;
+      // Bind basic
+      wrap.querySelectorAll("input,select").forEach(el=>{
+        el.addEventListener("input", ()=>{
+          const k = el.getAttribute("data-k");
+          if(k==="minEnabled") mat[k] = (el.value==="true");
+          else if(k==="minimum") mat[k] = Number(el.value||0);
+          else mat[k] = el.value;
+          saveMaster(master);
+        });
+      });
+      wrap.querySelector('[data-action="remove"]').addEventListener("click", ()=>{
+        if(confirm("Remove material?")){ master.materials.splice(idx,1); saveMaster(master); renderMaterials(); renderQuoteSelectors(); }
+      });
+
+      // Tiers per zone
+      const tiersRoot = wrap.querySelector("#tiers_"+idx);
+      tiersRoot.className="grid";
+      master.zones.forEach(z=>{
+        const box = document.createElement("div");
+        box.className="card";
+        const tiers = (mat.tiersByZone[z.id]||[]).map(t=>({...t}));
+        box.innerHTML = `<div class="flex"><div style="font-weight:600">${z.label}</div><div class="right"><button class="btn ghost" data-add>Add tier</button></div></div><div class="grid" data-rows></div>`;
+        const rows = box.querySelector("[data-rows]");
+        function draw(){
+          rows.innerHTML="";
+          tiers.forEach((t, ti)=>{
+            const row = document.createElement("div");
+            row.className="tier";
+            row.innerHTML = `
+              <span class="muted">Qty</span><input type="number" value="${t.qty}" style="width:80px">
+              <span class="muted">Price</span><input type="number" value="${t.price}" style="width:100px">
+              <span class="right"></span><button class="btn ghost" data-del>Delete</button>`;
+            const inputs = row.querySelectorAll("input");
+            inputs[0].addEventListener("input", ()=>{ tiers[ti].qty = Number(inputs[0].value||0); commit(); });
+            inputs[1].addEventListener("input", ()=>{ tiers[ti].price = Number(inputs[1].value||0); commit(); });
+            row.querySelector("[data-del]").addEventListener("click", ()=>{ tiers.splice(ti,1); commit(); draw(); });
+            rows.appendChild(row);
+          });
+        }
+        function commit(){
+          mat.tiersByZone[z.id] = tiers;
+          saveMaster(master);
+          renderQuotePrice(); // in case current selection affected
+        }
+        box.querySelector("[data-add]").addEventListener("click", ()=>{ tiers.push({qty:(tiers[tiers.length-1]?.qty||0)+1, price:0}); commit(); draw(); });
+        draw();
+        tiersRoot.appendChild(box);
+      });
+
+      materialsDiv.appendChild(wrap);
+    });
+  }
+  qs("addMaterial").addEventListener("click", ()=>{
+    const id = "material_"+Date.now();
+    master.materials.push({ id, label:"New Material", unit:"yard", minEnabled:false, minimum:0, tiersByZone:Object.fromEntries(master.zones.map(z=>[z.id,[{qty:1,price:0}]])) });
+    saveMaster(master); renderMaterials(); renderQuoteSelectors();
+  });
+
+  // Zones UI
+  const zonesDiv = qs("zones");
+  function renderZones(){
+    zonesDiv.innerHTML="";
+    master.zones.forEach((z, zi)=>{
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.innerHTML = `
+        <div class="row">
+          <div class="col-6"><label>Label</label><input value="${z.label}" data-k="label"></div>
+          <div class="col-6"><label>ID</label><input value="${z.id}" data-k="id"></div>
+          <div class="col-12"><label>Mileage range</label><input value="${z.rangeMiles||""}" data-k="rangeMiles"></div>
+          <div class="col-6"><label>Surcharge type</label>
+            <select data-k="surchargeType">
+              <option value="none" ${z.surchargeType==="none"?"selected":""}>None</option>
+              <option value="flat" ${z.surchargeType==="flat"?"selected":""}>Flat ($)</option>
+              <option value="per_mile" ${z.surchargeType==="per_mile"?"selected":""}>Per mile ($)</option>
+              <option value="percent" ${z.surchargeType==="percent"?"selected":""}>Percent (%)</option>
+            </select>
+          </div>
+          <div class="col-6"><label>Value</label><input type="number" value="${z.surchargeValue}" data-k="surchargeValue"></div>
+          <div class="col-12"><label>Description</label><input value="${z.description||""}" data-k="description"></div>
+        </div>
+        <div class="stack"><button class="btn ghost" data-remove>Delete zone</button></div>
+      `;
+      wrap.querySelectorAll("input,select").forEach(el=>{
+        el.addEventListener("input", ()=>{
+          const k = el.getAttribute("data-k");
+          z[k] = (k==="surchargeValue") ? Number(el.value||0) : el.value;
+          saveMaster(master);
+          renderQuoteSelectors();
+        });
+      });
+      wrap.querySelector("[data-remove]").addEventListener("click", ()=>{
+        if(!confirm("Remove this zone?")) return;
+        const removed = master.zones.splice(zi,1)[0];
+        master.materials.forEach(m=>{ delete m.tiersByZone[removed.id]; });
+        saveMaster(master); renderZones(); renderMaterials(); renderQuoteSelectors();
+      });
+      zonesDiv.appendChild(wrap);
+    });
+  }
+  qs("addZone").addEventListener("click", ()=>{
+    const id = "zone_"+Date.now();
+    master.zones.push({ id, label:"New Zone", rangeMiles:"", surchargeType:"none", surchargeValue:0, description:"" });
+    master.materials.forEach(m=>{ m.tiersByZone[id] = [{qty:1,price:0}]; });
+    saveMaster(master); renderZones(); renderMaterials(); renderQuoteSelectors();
+  });
+
+  // Quote UI
+  function priceFor(material, zoneId, qty){
+    const tiers = (material.tiersByZone[zoneId]||[]);
+    const t = tiers.find(tt => Number(tt.qty)===Number(qty));
+    if (!t) return { base:0, total:0, appliedMin:0, note:"Qty not in tier table" };
+    const base = Number(t.price||0);
+    const appliedMin = material.minEnabled ? Math.max(base, Number(material.minimum||0)) : base;
+    return { base, total: appliedMin, appliedMin };
+  }
+
+  function makeCopyLine(zone, material, qty, total, address){
+    const unit = material.unit==="yard" ? "yard" : "ton";
+    const ql = `${qty} ${unit}${qty>1?"s":""}`;
+    const addr = address ? ` · ${address}` : "";
+    return `${material.label} — ${ql} · ${zone.label}${addr} · $${total} — ${master.businessName||""}`.trim();
+  }
+
+  const addressEl = qs("address");
+  addressEl.value = localStorage.getItem(LAST_ADDR_KEY) || "";
+  addressEl.addEventListener("input", ()=>{
+    localStorage.setItem(LAST_ADDR_KEY, addressEl.value);
+    const d = encodeURIComponent(addressEl.value);
+    qs("openApple").href = `http://maps.apple.com/?daddr=${d}`;
+    renderQuotePreview();
+  });
+  qs("openApple").href = `http://maps.apple.com/?daddr=${encodeURIComponent(addressEl.value)}`;
+
+  function renderQuoteSelectors(){
+    const zSel = qs("qqZone");
+    const mSel = qs("qqMaterial");
+    const qSel = qs("qqQty");
+    zSel.innerHTML = master.zones.map(z=>`<option value="${z.id}">${z.label}</option>`).join("");
+    mSel.innerHTML = master.materials.map(m=>`<option value="${m.id}">${m.label}</option>`).join("");
+    renderQuotePrice();
+  }
+  function renderQuotePrice(){
+    const zId = qs("qqZone").value || master.zones[0]?.id;
+    const mId = qs("qqMaterial").value || master.materials[0]?.id;
+    const qty = Number(qs("qqQty").value || 1);
+    const zone = master.zones.find(z=>z.id===zId) || master.zones[0];
+    const mat = master.materials.find(m=>m.id===mId) || master.materials[0];
+    const { total, base, appliedMin, note } = priceFor(mat, zone.id, qty);
+    qs("qqTotal").textContent = total ? `$${total.toFixed(0)}` : "—";
+    qs("qqExplain").textContent = total ? `Base tier: $${base.toFixed(0)}${mat.minEnabled ? ` · Min applied: $${(mat.minimum||0)}` : ""}` : (note||"");
+    renderQuotePreview();
+  }
+  function renderQuotePreview(){
+    const zId = qs("qqZone").value || master.zones[0]?.id;
+    const mId = qs("qqMaterial").value || master.materials[0]?.id;
+    const qty = Number(qs("qqQty").value || 1);
+    const zone = master.zones.find(z=>z.id===zId) || master.zones[0];
+    const mat = master.materials.find(m=>m.id===mId) || master.materials[0];
+    const { total } = priceFor(mat, zId, qty);
+    const line = makeCopyLine(zone, mat, qty, total, addressEl.value);
+    qs("copyPreview").textContent = line;
+  }
+  ["qqZone","qqMaterial","qqQty"].forEach(id=> qs(id).addEventListener("change", ()=>renderQuotePrice()));
+
+  qs("copyBtn").addEventListener("click", async ()=>{
+    const zId = qs("qqZone").value || master.zones[0]?.id;
+    const mId = qs("qqMaterial").value || master.materials[0]?.id;
+    const qty = Number(qs("qqQty").value || 1);
+    const zone = master.zones.find(z=>z.id===zId) || master.zones[0];
+    const mat = master.materials.find(m=>m.id===mId) || master.materials[0];
+    const { total } = priceFor(mat, zId, qty);
+    const line = makeCopyLine(zone, mat, qty, total, addressEl.value);
+    try{
+      await navigator.clipboard.writeText(line);
+      alert("Copied to clipboard!");
+    }catch{
+      const ta = document.createElement("textarea");
+      ta.value = line; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+      alert("Copied to clipboard!");
+    }
+  });
+
+  // Export / Import
+  qs("exportBtn").addEventListener("click", ()=>{
+    const data = JSON.stringify(master, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hauling_master_pricing_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+  });
+  qs("importBtn").addEventListener("click", ()=> qs("fileInput").click());
+  qs("fileInput").addEventListener("change", (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const data = JSON.parse(String(reader.result));
+        master = data;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(master));
+        render();
+        alert("Pricing imported.");
+      }catch{ alert("Invalid JSON file."); }
+    };
+    reader.readAsText(f);
+  });
+
+  function render(){
+    renderMaterials();
+    renderZones();
+    renderQuoteSelectors();
+    qs("live").textContent = JSON.stringify(master, null, 2);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
