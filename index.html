@@ -989,6 +989,31 @@ Leonard Gibson
   card.replaceWith(wrap);
 })();
 </script>
+<script>
+(function(){
+  // 1) Remove the visible Paste box card if it exists
+  const pb = document.getElementById('pasteBox');
+  if (pb) {
+    // Try to remove its outer card container
+    const card =
+      pb.closest('.bg-white.rounded-2xl.shadow.p-3.mb-3') ||
+      pb.closest('.bg-white') ||
+      pb.closest('div');
+    if (card) card.remove();
+  }
+
+  // 2) Make sure code that references these IDs never crashes
+  ['pasteBox','pasteBtn','clearPaste'].forEach(id => {
+    if (!document.getElementById(id)) {
+      const el = id === 'pasteBox' ? document.createElement('textarea') : document.createElement('button');
+      el.id = id;
+      if (el.tagName === 'BUTTON') el.type = 'button';
+      el.style.display = 'none';
+      document.body.appendChild(el);
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
