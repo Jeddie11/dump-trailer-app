@@ -661,6 +661,226 @@
   }
 })();
 </script>
+<script>
+/* Drag to Reorder jobs — touch & mouse, per-day, persists in localStorage */
+(function(){
+  const ORDER_KEY = 'DT_ORDER_V1';
+
+  // ---------- tiny helpers ----------
+  const $  = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const getJobById = id => (window.jobs||[]).find(j => j.id === id) || null;
+
+  function loadOrder(){
+    try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '{}'); } catch { return {}; }
+  }
+  function saveOrder(obj){
+    localStorage.setItem(ORDER_KEY, JSON.stringify(obj));
+  }
+  function orderFor(date){
+    const o = loadOrder();
+    return (o && o[date]) ? o[date] : [];
+  }
+  function setOrderFor(date, ids){
+    const o = loadOrder();
+    o[date] = ids;
+    saveOrder(o);
+  }
+
+  // Reapply stored order within the current list (per date)
+  function applyStoredOrder(){
+    const list = $('#list');
+    if (!list) return;
+
+    // Ensure each card has data-id and data-date
+    $$('#list [data-id]').forEach(card => {
+      const id = card.dataset.id;
+      const job = getJobById(id);
+      if (job) card.dataset.date = job.date || '';
+    });
+
+    // Group cards by date and reorder inside each group
+    const groups = {};
+    $$('#list [data-id]').forEach(card => {
+      const d = card.dataset.date || '';
+      (groups[d] ||= []).push(card);
+    });
+
+    for (const [date, cards] of Object.entries(groups)){
+      const ids = orderFor(date);
+      if (!ids.length) continue;
+
+      // Sort cards by stored order; keep unknowns at the end (stable)
+      cards.sort((a,b)=>{
+        const ia = ids.indexOf(a.dataset.id);
+        const ib = ids.indexOf(b.dataset.id);
+        return (ia===-1 && ib===-1) ? 0 : (ia===-1 ? 1 : (ib===-1 ? -1 : ia-ib));
+      });
+
+      // Reinsert in the DOM in the new order (keeping other-date cards untouched)
+      // We insert in place by walking the whole list and moving this date's cards in sequence.
+      let anchor = null;
+      for (const card of cards){
+        // Find next position after the last placed card of this date,
+        // otherwise before the next card with a different date boundary.
+        if (anchor) {
+          anchor.after(card);
+        } else {
+          // place the first card where it currently is (acts as anchor), then move others after it
+          anchor = card;
+        }
+        anchor = card;
+      }
+    }
+  }
+
+  // ---------- drag logic ----------
+  let dragging = null;   // { card, id, date, placeholder }
+  let moveHandler, upHandler;
+
+  // a light placeholder with same height as the card being moved
+  function makePlaceholder(h){
+    const ph = document.createElement('div');
+    ph.className = 'drag-ph';
+    ph.style.height = h + 'px';
+    ph.style.border = '2px dashed #d1d5db';
+    ph.style.borderRadius = '12px';
+    ph.style.margin = '4px 0';
+    return ph;
+  }
+
+  function pointerDown(e){
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+
+    const card = handle.closest('[data-id]');
+    if (!card) return;
+
+    const id = card.dataset.id;
+    const job = getJobById(id);
+    if (!job) return;
+
+    // Lock to SAME DATE only
+    const date = job.date || '';
+
+    // Prepare drag
+    e.preventDefault();
+    card.classList.add('dragging');
+    const ph = makePlaceholder(card.offsetHeight);
+    card.parentElement.insertBefore(ph, card.nextSibling);
+
+    dragging = { card, id, date, placeholder: ph };
+
+    // Pointer capture (works on mouse & touch)
+    moveHandler = pointerMove;
+    upHandler = pointerUp;
+    window.addEventListener('pointermove', moveHandler);
+    window.addEventListener('pointerup', upHandler);
+  }
+
+  function pointerMove(e){
+    if (!dragging) return;
+
+    const { card, date, placeholder } = dragging;
+
+    // Card follows finger a bit (optional visual)
+    card.style.opacity = '0.6';
+
+    // Find element under pointer
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const overCard = el && el.closest('#list [data-id]');
+    if (!overCard || overCard === card) return;
+
+    // Only allow dropping among the same date
+    if ((overCard.dataset.date||'') !== date) return;
+
+    const r = overCard.getBoundingClientRect();
+    const before = e.clientY < r.top + r.height/2;
+
+    if (before) {
+      overCard.parentElement.insertBefore(placeholder, overCard);
+    } else {
+      overCard.parentElement.insertBefore(placeholder, overCard.nextSibling);
+    }
+  }
+
+  function pointerUp(){
+    if (!dragging) return;
+    const { card, id, date, placeholder } = dragging;
+
+    // Place card where placeholder is
+    placeholder.parentElement.insertBefore(card, placeholder);
+    card.classList.remove('dragging');
+    card.style.opacity = '';
+    placeholder.remove();
+
+    // Persist new order for that date (only visible cards of same date)
+    const ids = $$('#list [data-id]').filter(c => (c.dataset.date||'')===date).map(c => c.dataset.id);
+    setOrderFor(date, ids);
+
+    // Cleanup
+    dragging = null;
+    window.removeEventListener('pointermove', moveHandler);
+    window.removeEventListener('pointerup', upHandler);
+  }
+
+  // Attach handles & listeners after each list render
+  function attachDrag(){
+    const list = $('#list');
+    if (!list) return;
+
+    // Ensure each card has data-id/date and a handle
+    $$('#list > div').forEach(card => {
+      const id = card.dataset.id || null;
+      if (!id) return;
+      const job = getJobById(id);
+      if (job) card.dataset.date = job.date || '';
+
+      // Add a handle if missing
+      if (!card.querySelector('.drag-handle')) {
+        const rightCol = card.querySelector('.flex.flex-col.gap-2.items-end') || card;
+        const h = document.createElement('button');
+        h.type = 'button';
+        h.className = 'drag-handle rounded-xl border px-2 py-1 text-sm';
+        h.title = 'Drag to reorder (same day)';
+        h.textContent = '↕︎';
+        // Put the handle above the actions if possible
+        rightCol.insertBefore(h, rightCol.firstChild);
+      }
+    });
+
+    // Global pointerdown on handles
+    list.removeEventListener('pointerdown', pointerDown);
+    list.addEventListener('pointerdown', pointerDown, { passive:false });
+
+    // Apply stored order (per day) to the freshly rendered list
+    applyStoredOrder();
+  }
+
+  // Minimal styling for dragging state
+  const style = document.createElement('style');
+  style.textContent = `
+    #list .dragging{ outline:2px solid #93c5fd; border-radius:12px; }
+    #list .drag-handle{ background:#fff }
+    @media (hover:hover){
+      #list .drag-handle{ cursor:grab }
+      #list .drag-handle:active{ cursor:grabbing }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Hook into your renderList so drag is re-wired every time
+  const origRender = window.renderList;
+  if (typeof origRender === 'function'){
+    window.renderList = function(){ origRender.apply(this, arguments); attachDrag(); };
+  } else {
+    // If renderList isn't defined yet, try after DOM ready, then watch for later calls
+    document.addEventListener('DOMContentLoaded', attachDrag);
+    // Also re-run when jobs change via storage (another tab)
+    window.addEventListener('storage', e => { if (e.key==='dt_jobs') attachDrag(); });
+  }
+})();
+</script>
 
 </body>
 </html>
