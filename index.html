@@ -455,6 +455,212 @@
   });
 })();
 </script>
+<script>
+/* Edit Job modal + Search filter + renderList upgrade (keeps Profit bar working) */
+(function(){
+  // --- small helpers ---
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const ensure = (id, maker) => document.getElementById(id) || maker();
+
+  // Insert a compact Search bar above the jobs list (once)
+  ensure('searchRow', () => {
+    const tabs = document.querySelector('.flex.gap-2.my-3');
+    const row = document.createElement('div');
+    row.id = 'searchRow';
+    row.className = 'mb-3';
+    row.innerHTML = `
+      <input id="searchJobs" class="w-full rounded-xl border px-3 py-2"
+             placeholder="Search jobs (name, address, material, status)"/>
+    `;
+    (tabs?.parentElement || document.body).insertBefore(row, document.getElementById('list'));
+    return row;
+  });
+
+  // Search state
+  function searchTerm(){
+    return (document.getElementById('searchJobs')?.value || '').trim().toLowerCase();
+  }
+  document.getElementById('searchJobs')?.addEventListener('input', ()=>{
+    if (typeof window.renderList === 'function') window.renderList();
+  });
+
+  // --- Edit modal UI (once) ---
+  ensure('editJobModal', () => {
+    const m = document.createElement('div');
+    m.id = 'editJobModal';
+    m.style.cssText = 'position:fixed;inset:0;display:none;z-index:10000;background:rgba(0,0,0,.4);';
+    m.innerHTML = `
+      <div style="position:absolute;left:12px;right:12px;top:10%;margin:auto;max-width:720px;background:#fff;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.25)">
+        <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800">Edit Job</div>
+          <div>
+            <button id="editCancel" class="rounded-xl border px-3 py-1 mr-2">Cancel</button>
+            <button id="editSave" class="rounded-xl px-3 py-1 text-white" style="background:#111">Save</button>
+          </div>
+        </div>
+        <div style="padding:12px 16px">
+          <div class="grid grid-cols-2 gap-2">
+            <input id="e_date" class="rounded-xl border px-3 py-2" placeholder="Date (YYYY-MM-DD)" />
+            <input id="e_time" class="rounded-xl border px-3 py-2" placeholder="Time (e.g., 10:30 AM)" />
+            <input id="e_customer" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Customer name" />
+            <input id="e_address" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Address" />
+            <select id="e_material" class="rounded-xl border px-3 py-2"></select>
+            <input id="e_loadSize" type="number" min="0" step="0.01" class="rounded-xl border px-3 py-2" placeholder="Tons/Yards" />
+            <input id="e_price" type="number" min="0" step="0.01" class="rounded-xl border px-3 py-2" placeholder="Price" />
+            <select id="e_status" class="rounded-xl border px-3 py-2">
+              <option>Scheduled</option><option>In Progress</option><option>Complete</option><option>Canceled</option>
+            </select>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    return m;
+  });
+
+  let editingId = null;
+
+  function openEdit(job){
+    editingId = job.id;
+    // material options from your main selector (keeps list in sync)
+    const srcSel = document.getElementById('material');
+    const eMat = document.getElementById('e_material'); eMat.innerHTML = '';
+    if (srcSel) {
+      Array.from(srcSel.options).forEach(o=>{
+        if (!o.value && !o.textContent.trim()) return;
+        const opt = document.createElement('option');
+        opt.value = o.textContent.trim();
+        opt.textContent = o.textContent.trim();
+        eMat.appendChild(opt);
+      });
+    } else {
+      // fallback
+      ['Crush & Run','#57 Stone','Clean Sand','Sand Clay','Fill Dirt','Top Soil','#4 Stone']
+      .forEach(t=>{ const opt=document.createElement('option'); opt.value=t; opt.textContent=t; eMat.appendChild(opt); });
+    }
+
+    // fill fields
+    document.getElementById('e_date').value = job.date || '';
+    document.getElementById('e_time').value = job.time || '';
+    document.getElementById('e_customer').value = job.customer || '';
+    document.getElementById('e_address').value = job.address || '';
+    document.getElementById('e_material').value = job.material || '';
+    document.getElementById('e_loadSize').value = job.loadSize || '';
+    document.getElementById('e_price').value = job.price || '';
+    document.getElementById('e_status').value = job.status || 'Scheduled';
+
+    document.getElementById('editJobModal').style.display = 'block';
+  }
+  function closeEdit(){ document.getElementById('editJobModal').style.display = 'none'; editingId=null; }
+
+  document.getElementById('editCancel').onclick = closeEdit;
+  document.getElementById('editSave').onclick = () => {
+    if (!editingId) return closeEdit();
+    const idx = (window.jobs||[]).findIndex(j => j.id === editingId);
+    if (idx === -1) return closeEdit();
+
+    const j = window.jobs[idx];
+    j.date     = document.getElementById('e_date').value.trim() || j.date;
+    j.time     = document.getElementById('e_time').value.trim();
+    j.customer = document.getElementById('e_customer').value.trim();
+    j.address  = document.getElementById('e_address').value.trim();
+    j.material = document.getElementById('e_material').value;
+    j.loadSize = document.getElementById('e_loadSize').value ? parseFloat(document.getElementById('e_loadSize').value) : '';
+    j.price    = document.getElementById('e_price').value ? parseFloat(document.getElementById('e_price').value) : '';
+    j.status   = document.getElementById('e_status').value || j.status;
+
+    if (typeof window.saveJobs === 'function') window.saveJobs();
+    if (typeof window.renderList === 'function') window.renderList();
+    closeEdit();
+  };
+
+  // Keep reference to any existing profit refresher
+  const refreshProfit = window.refreshProfit || function(){};
+
+  // Replace renderList with an enhanced version (adds Edit + search filter)
+  window.renderList = function(){
+    const list = document.getElementById('list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // Start from your existing filtered view (tab logic)
+    let items = (typeof window.filteredJobs === 'function') ? window.filteredJobs() : (window.jobs||[]);
+
+    // Apply search filter
+    const term = searchTerm();
+    if (term) {
+      items = items.filter(j => {
+        const hay = [
+          j.customer||'',
+          j.address||'',
+          j.material||'',
+          j.status||'',
+          j.price!=null ? String(j.price) : ''
+        ].join(' ').toLowerCase();
+        return hay.includes(term);
+      });
+    }
+
+    if (!items.length){
+      const div=document.createElement('div');
+      div.className='text-center text-gray-500';
+      div.textContent='No jobs here yet.';
+      list.appendChild(div);
+      refreshProfit();
+      return;
+    }
+
+    for (const job of items){
+      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
+      const row=document.createElement('div'); row.className='flex justify-between items-center';
+
+      const left=document.createElement('div');
+      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
+      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=(job.date||'')+' '+(job.time||'');
+      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address||'';
+      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
+      meta.textContent=[job.material, job.loadSize? (job.loadSize+' tons'):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+
+      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
+
+      const actions=document.createElement('div'); actions.className='flex gap-2';
+      const editBtn=document.createElement('button'); editBtn.className='rounded-xl px-3 py-1 border text-sm'; editBtn.textContent='Edit';
+      editBtn.onclick=()=>openEdit(job);
+
+      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)';
+      goBtn.textContent='GO'; goBtn.onclick=()=>{ if (typeof window.openAppleMaps==='function') window.openAppleMaps(window.selectedHub, job.address); };
+
+      actions.appendChild(editBtn); actions.appendChild(goBtn);
+
+      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
+      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===(job.status||'Scheduled')) o.selected=true; statusSel.appendChild(o); });
+      statusSel.onchange=()=>{ job.status=statusSel.value; if (typeof window.saveJobs==='function') window.saveJobs(); window.renderList(); };
+
+      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
+      delBtn.onclick=()=>{ window.jobs = (window.jobs||[]).filter(j => j.id !== job.id); if (typeof window.saveJobs==='function') window.saveJobs(); window.renderList(); };
+
+      right.appendChild(actions);
+      right.appendChild(statusSel);
+      right.appendChild(delBtn);
+
+      row.appendChild(left); row.appendChild(right);
+      card.appendChild(row);
+      list.appendChild(card);
+    }
+
+    // keep any attached summaries/profit bars up to date
+    refreshProfit();
+  };
+
+  // Initial paint, if jobs already present
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ()=> window.renderList && window.renderList());
+  } else {
+    window.renderList && window.renderList();
+  }
+})();
+</script>
 
 </body>
 </html>
