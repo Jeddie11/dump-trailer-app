@@ -1,136 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dump Trailer — iPhone</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --brand-yellow: #FACC15; --brand-black: #000; }
+    body { -webkit-tap-highlight-color: transparent; }
+    /* Splash overlay */
+    #splash { position: fixed; inset: 0; background: #000; display: flex;
+      align-items: center; justify-content: center; z-index: 50; transition: opacity .4s ease; }
+    #splash svg { color: var(--brand-yellow); width: 96px; height: 96px; }
+    #splash.hide { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <!-- Splash screen (logo on black) -->
+  <div id="splash" aria-hidden="true">
+    <svg viewBox="0 0 64 64" fill="currentColor" aria-label="Dump Trailer">
+      <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+    </svg>
+  </div>
+
+  <div class="min-h-screen p-3 sm:p-4 max-w-xl mx-auto">
+    <!-- Header / Branding -->
+    <header class="mb-3 rounded-2xl bg-black text-[var(--brand-yellow)] p-3 flex items-center gap-3 shadow">
+      <svg width="36" height="36" viewBox="0 0 64 64" fill="currentColor" class="shrink-0">
+        <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+      </svg>
+      <div>
+        <div class="text-xl font-semibold leading-tight">Dump Trailer</div>
+        <div class="text-xs opacity-80">Hub → Customer • Apple Maps</div>
+      </div>
+    </header>
+
+    <!-- Hub controls -->
+    <div class="mt-2 grid grid-cols-1 gap-2">
+      <div class="flex gap-2 items-center">
+        <label class="text-sm text-gray-700">Hub</label>
+        <select id="hubSelect" class="flex-1 rounded-xl border px-3 py-2"></select>
+      </div>
+
+      <!-- Admin card (replaces Add Hub box) -->
+      <div class="rounded-2xl bg-white border shadow p-3">
+        <div class="font-semibold text-base">Admin</div>
+        <p class="text-sm text-gray-600 mb-2">Manage materials, zones, and pricing.</p>
+        <a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">
+          Open Admin / Pricing
+        </a>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 my-3">
+      <button data-tab="today" class="tab px-3 py-2 rounded-xl border bg-black text-white">Today</button>
+      <button data-tab="tomorrow" class="tab px-3 py-2 rounded-xl border bg-white">Tomorrow</button>
+      <button data-tab="week" class="tab px-3 py-2 rounded-xl border bg-white">This Week</button>
+      <button data-tab="all" class="tab px-3 py-2 rounded-xl border bg-white">All</button>
+    </div>
+
+    <!-- Quick add form -->
+    <div class="bg-white rounded-2xl shadow p-3 mb-3">
+      <div class="grid grid-cols-2 gap-2">
+        <input id="date" class="rounded-xl border px-3 py-2" placeholder="Date (YYYY-MM-DD or MM/DD/YYYY)" />
+        <input id="time" class="rounded-xl border px-3 py-2" placeholder="Time (e.g., 10:30 AM)" />
+        <input id="customer" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Customer name" />
+        <input id="address" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Address" />
+        <select id="material" class="rounded-xl border px-3 py-2">
+          <option value="">Material</option>
+          <option>Crush & Run</option>
+          <option>#57 Stone</option>
+          <option>Clean Sand</option>
+          <option>Sand Clay</option>
+          <option>Fill Dirt</option>
+          <option>Top Soil</option>
+          <option>#4 Stone</option>
+        </select>
+        <select id="loadSize" class="rounded-xl border px-3 py-2">
+          <option value="">Load Size (tons)</option>
+          <option value="1">1 ton</option>
+          <option value="2">2 tons</option>
+          <option value="3">3 tons</option>
+          <option value="4">4 tons</option>
+        </select>
+        <input id="price" class="rounded-xl border px-3 py-2" placeholder="Price (auto)" />
+        <select id="status" class="rounded-xl border px-3 py-2">
+          <option>Scheduled</option>
+          <option>In Progress</option>
+          <option>Complete</option>
+          <option>Canceled</option>
+        </select>
+      </div>
+      <div class="mt-2 flex gap-2">
+        <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
+        <button id="exportBtn" class="rounded-xl px-4 py-2 border">Export</button>
+        <label class="rounded-xl px-4 py-2 border cursor-pointer">Import
+          <input id="importInput" type="file" class="hidden" accept="application/json" />
+        </label>
+      </div>
+      <div id="autoNote" class="text-xs text-gray-500 mt-2"></div>
+    </div>
+
+    <!-- Jobs list -->
+    <div id="list" class="space-y-2"></div>
+    <footer class="h-10"></footer>
+  </div>
+
 <script>
-/* === Receipt button + printable receipt (auto-calc + custom override + filename) === */
-(function(){
-  // ----- Brand header (edit if you change your name/tag/phone) -----
-  const COMPANY_NAME  = "Augusta Sand & Gravel";
-  const COMPANY_TAG   = "Material Hauling";
-  const COMPANY_PHONE = ""; // e.g. "(706) 555-1234" or leave empty
+  // ---------- helpers ----------
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function tomorrowStr(){ return new Date(Date.now()+86400000).toISOString().slice(0,10); }
+  function withinWeek(d){
+    const dt=new Date(d+'T00:00:00');
+    const start=new Date(); start.setHours(0,0,0,0);
+    const end=new Date(start); end.setDate(end.getDate()+6);
+    return dt>=start && dt<=end;
+  }
+  function normalizeDate(input){
+    if(!input) return todayStr();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+    const m=input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if(!m) return todayStr();
+    let mm=m[1],dd=m[2],yy=m[3];
+    if(yy.length===2) yy=(parseInt(yy,10)<50?'20':'19')+yy;
+    return String(yy).padStart(4,'0')+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+  }
+  function uid(){ return String(Date.now())+Math.random().toString(36).slice(2); }
+  function readLS(k,f){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} }
+  function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 
-  // Currency helper
-  const fmt = v => (isFinite(v) ? Number(v).toFixed(2) : "");
+  // Keep per-ton fallback rates for materials that aren’t in the master sheet
+  const PRICE_PER_TON = {"Crush & Run":60,"#57 Stone":70,"Clean Sand":65,"Top Soil":60,"#4 Stone":70,"Sand Clay":null,"Fill Dirt":null};
 
-  // Build + print the receipt for a job
-  function generateReceipt(job){
-    const css = `
-      *{box-sizing:border-box}
-      body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;padding:24px;color:#111}
-      h1{margin:0;font-size:22px}
-      h2{margin:2px 0 12px;color:#475569;font-size:12px}
-      .row{display:flex;gap:16px;margin-top:10px}
-      .col{flex:1}
-      table{width:100%;border-collapse:collapse;margin-top:12px}
-      th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;font-size:12px}
-      thead{background:#f8fafc}
-      .muted{color:#64748b;font-size:12px;margin-top:8px}
-    `;
+  // ---------- app state ----------
+  let hubs = readLS('dt_hubs', ['Sample & Son, Evans, GA','4567 Chamberlain Ferry Rd, Lincolnton, GA 30817']);
+  let selectedHub = readLS('dt_selected_hub', hubs[0]);
+  let jobs = readLS('dt_jobs', []);
+  let tab = 'today';
 
-    // Filename from date + customer
-    const clean = s => (s||"").toString().trim().replace(/\s+/g,"_").replace(/[^a-z0-9_\-]/gi,"");
-    const dateStr = job.date || new Date().toISOString().slice(0,10);
-    const nameStr = clean(job.customer || "Customer");
-    const fileName = `ASG_Receipt_${dateStr}_${nameStr}.pdf`;
+  // ---------- elements ----------
+  const hubSelect = document.getElementById('hubSelect');
+  const dateI = document.getElementById('date');
+  const timeI = document.getElementById('time');
+  const customerI = document.getElementById('customer');
+  const addressI = document.getElementById('address');
+  const materialI = document.getElementById('material');
+  const loadSizeI = document.getElementById('loadSize');
+  const priceI = document.getElementById('price');
+  const statusI = document.getElementById('status');
+  const autoNote = document.getElementById('autoNote');
+  const list = document.getElementById('list');
+  const addJobBtn = document.getElementById('addJobBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const importInput = document.getElementById('importInput');
 
-    // Pull data from job
-    const qtyRaw   = job.loadSize ?? 0;
-    const savedTotal = job.price ?? 0; // might already be a total you set when scheduling
-    const qty = Number(qtyRaw) || 0;
+  window.addEventListener('load', () => {
+    setTimeout(() => document.getElementById('splash').classList.add('hide'), 400);
+  });
 
-    // 1) Ask price per unit (defaults to derived total/qty if present)
-    const derivedUnit = (qty > 0 && isFinite(savedTotal)) ? (Number(savedTotal) / qty) : "";
-    const unitPrompt  = prompt("Price per unit ($/ton). Leave blank to use derived or existing:", derivedUnit ? Number(derivedUnit).toFixed(2) : "");
-    const unitPrice   = unitPrompt === null
-      ? (derivedUnit || 0)                  // cancel → fall back
-      : (unitPrompt.trim()==="" ? (derivedUnit||0) : Number(unitPrompt));
-
-    // 2) Auto-calc total; allow manual override
-    const autoTotal   = (isFinite(qty) && isFinite(unitPrice)) ? qty * unitPrice : (Number(savedTotal)||0);
-    const totalPrompt = prompt("Total price ($). You can override:", fmt(autoTotal));
-    const grandTotal  = totalPrompt === null ? autoTotal : (Number(totalPrompt)||0);
-
-    // 3) Payment + notes (optional)
-    const method = prompt("Payment method (Cash, CashApp, Venmo, Zelle, Card):", "Cash") || "Cash";
-    const notes  = prompt("Notes (optional):", "") || "";
-
-    const html = `
-      <!doctype html><html>
-        <head>
-          <meta charset="utf-8">
-          <title>${fileName}</title>
-          <style>${css}</style>
-        </head>
-        <body>
-          <h1>${COMPANY_NAME}</h1>
-          <h2>${[COMPANY_TAG, COMPANY_PHONE].filter(Boolean).join(" • ")}</h2>
-
-          <div class="row">
-            <div class="col"><strong>Customer:</strong> ${job.customer || ""}</div>
-            <div class="col"><strong>Date:</strong> ${job.date || ""} ${job.time || ""}</div>
-          </div>
-
-          <table>
-            <thead>
-              <tr><th>Material</th><th>Quantity</th><th>Unit</th><th>Price/Unit</th><th>Total</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>${job.material || ""}</td>
-                <td>${qty || ""}</td>
-                <td>tons</td>
-                <td>$${fmt(unitPrice)}</td>
-                <td>$${fmt(grandTotal)}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="row" style="margin-top:8px">
-            <div class="col"><strong>Delivery Address:</strong><br>${job.address || ""}</div>
-            <div class="col"><strong>Payment Method:</strong> ${method}</div>
-          </div>
-
-          <p class="muted">Notes: ${notes || "—"}</p>
-          <p class="muted">Thank you for your business!</p>
-
-          <script>window.print();<\/script>
-        </body>
-      </html>
-    `;
-
-    const w = window.open("", "receipt");
-    w.document.write(html);
-    w.document.close();
-    // Many desktop browsers use <title> as default filename for "Save as PDF"
+  function renderHubs(){
+    hubSelect.innerHTML='';
+    hubs.forEach(h=>{
+      const o=document.createElement('option');
+      o.value=h; o.textContent=h; hubSelect.appendChild(o);
+    });
+    hubSelect.value = selectedHub;
   }
 
-  // Hook into your renderList to inject a "Receipt" button on each job card
-  const origRender = window.renderList;
-  window.renderList = function(){
-    if (typeof origRender === "function") origRender.apply(this, arguments);
+  // If Zone picker already filled a price, don't override it here
+  function calcPrice(){
+    const mat = materialI.value;
+    const tons = parseFloat(loadSizeI.value || '0');
 
-    document.querySelectorAll("#list > div[data-id]").forEach(card => {
-      if (card.querySelector(".btn-receipt")) return;
+    if (priceI.value) { // already set by master sheet via Zone picker
+      autoNote.textContent = `Price from master sheet${tons?` • ${tons} tons`:''}`;
+      return;
+    }
 
-      const rightCol = card.querySelector(".flex.flex-col.gap-2.items-end") || card;
-      const actions  = rightCol.querySelector("div.flex.gap-2") || rightCol;
+    const per = PRICE_PER_TON[mat];
+    if(!mat || !tons){ priceI.value=''; autoNote.textContent=''; return; }
+    if(per==null){ priceI.value=''; autoNote.textContent='Set price manually (no rate yet).'; return; }
+    const price = Math.round(per * tons * 100)/100;
+    priceI.value = String(price);
+    autoNote.textContent = `${mat} @ $${per}/ton × ${tons} tons`;
+  }
+  materialI.onchange = calcPrice;
+  loadSizeI.onchange = calcPrice;
 
-      const btn = document.createElement("button");
-      btn.className = "btn-receipt rounded-xl px-3 py-1 border text-sm";
-      btn.textContent = "Receipt";
-      btn.onclick = () => {
-        const id  = card.dataset.id;
-        const job = (window.jobs || []).find(j => j.id === id);
-        if (!job) return alert("Job not found.");
-        generateReceipt(job);
-      };
+  function filteredJobs(){
+    if(tab==='today') return jobs.filter(j => j.date === todayStr() && j.status!=='Complete' && j.status!=='Canceled');
+    if(tab==='tomorrow') return jobs.filter(j => j.date === tomorrowStr() && j.status!=='Complete' && j.status!=='Canceled');
+    if(tab==='week') return jobs.filter(j => withinWeek(j.date) && j.status!=='Complete' && j.status!=='Canceled');
+    return jobs;
+  }
 
-      actions.insertBefore(btn, actions.firstChild);
-    });
+  function openAppleMaps(hub,addr){
+    const url = 'https://maps.apple.com/?saddr='+encodeURIComponent(hub)+'&daddr='+encodeURIComponent(addr);
+    window.open(url, '_blank');
+  }
+
+  function saveJobs(){ writeLS('dt_jobs', jobs); }
+  function saveHubs(){ writeLS('dt_hubs', hubs); }
+  function saveSelectedHub(){ writeLS('dt_selected_hub', selectedHub); }
+
+  function renderList(){
+    list.innerHTML='';
+    const items = filteredJobs();
+    if(!items.length){
+      const div=document.createElement('div'); div.className='text-center text-gray-500'; div.textContent='No jobs here yet.'; list.appendChild(div); return;
+    }
+    for(const job of items){
+      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3';
+      const row=document.createElement('div'); row.className='flex justify-between items-center';
+
+      const left=document.createElement('div');
+      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
+      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
+      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
+      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
+      meta.textContent=[job.material, job.loadSize? (job.loadSize+' tons'):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+
+      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
+      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)';
+      goBtn.textContent='GO'; goBtn.onclick=()=>openAppleMaps(selectedHub, job.address);
+
+      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
+      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o); });
+      statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
+
+      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
+      delBtn.onclick=()=>{ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); };
+
+      right.appendChild(goBtn); right.appendChild(statusSel); right.appendChild(delBtn);
+      row.appendChild(left); row.appendChild(right);
+      card.appendChild(row); list.appendChild(card);
+    }
+  }
+
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('bg-black','text-white'));
+      btn.classList.add('bg-black','text-white'); tab = btn.dataset.tab; renderList();
+    };
+  });
+
+  hubSelect.onchange=()=>{ selectedHub = hubSelect.value; saveSelectedHub(); };
+
+  addJobBtn.onclick=()=>{
+    // Keep whatever price is already in #price (prefer master sheet via Zone picker)
+    calcPrice();
+    const tons = loadSizeI.value ? parseFloat(loadSizeI.value) : null;
+    const job={
+      id: uid(),
+      date: normalizeDate(dateI.value || todayStr()),
+      time: timeI.value || '',
+      customer: customerI.value || '',
+      address: addressI.value || '',
+      material: materialI.value || '',
+      loadSize: tons || '',
+      price: priceI.value || '',
+      status: statusI.value || 'Scheduled'
+    };
+    if(!job.address || !job.customer) return;
+    jobs.push(job); saveJobs();
+    timeI.value = customerI.value = addressI.value = ''; materialI.value=''; loadSizeI.value=''; priceI.value=''; statusI.value='Scheduled'; dateI.value = todayStr();
+    renderList();
   };
 
-  // Attach after first render
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => window.renderList && window.renderList());
+  // Export/Import
+  exportBtn.onclick = () => {
+    const data = JSON.stringify({ hubs, selectedHub, jobs }, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `dump-trailer-${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+  importInput.onchange = async () => {
+    const f = importInput.files[0]; if(!f) return;
+    const text = await f.text();
+    try {
+      const obj = JSON.parse(text);
+      if(Array.isArray(obj.hubs)) hubs = obj.hubs;
+      if(obj.selectedHub) selectedHub = obj.selectedHub;
+      if(Array.isArray(obj.jobs)) jobs = obj.jobs;
+      saveHubs(); saveSelectedHub(); saveJobs();
+      renderHubs(); renderList();
+    } catch(e) { alert('Import failed: invalid JSON'); }
+    importInput.value = '';
+  };
+
+  // init
+  renderHubs();
+  dateI.value = todayStr();
+  renderList();
+</script>
+
+<!-- Floating Zone picker + price wiring (safe-area + remembers last zone) -->
+<style>
+  .zone-fab{
+    position:fixed;
+    right:calc(16px + env(safe-area-inset-right));
+    bottom:calc(16px + env(safe-area-inset-bottom));
+    z-index:9999;
+    display:flex;align-items:center;gap:8px;
+    background:#111827;color:#fff;padding:10px 12px;border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,.35);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif
+  }
+  .zone-fab button{border:1px solid #374151;background:#1f2937;color:#fff;padding:6px 10px;border-radius:999px;font-weight:700;cursor:pointer}
+  .zone-fab button.active{background:#2563eb;border-color:#2563eb}
+  .zone-chip{font-size:13px;margin-top:6px;color:#111}
+</style>
+<div class="zone-fab" id="zoneFab">
+  <span style="font-weight:600;opacity:.9">Zone</span>
+  <button type="button" data-zone="zone1">1</button>
+  <button type="button" data-zone="zone2">2</button>
+</div>
+<script>
+(function(){
+  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+  const defaults = {
+    zones:[{id:"zone1",label:"Zone 1 (Local)"},{id:"zone2",label:"Zone 2 (Extended)"}],
+    materials:[
+      { id:"fill_dirt", label:"Fill Dirt", unit:"yard", minEnabled:false, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
+                      zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] }},
+      { id:"crush_and_run", label:"Crush & Run", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
+                      zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] }},
+      { id:"no57", label:"#57 Stone", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
+                      zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] }},
+      { id:"no4", label:"#4 Stone", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140}],
+                      zone2:[{qty:1,price:100},{qty:2,price:200}] }}
+    ]
+  };
+  const master = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }catch{ return defaults; } })();
+
+  // find selects/inputs on the main form
+  const matSel = document.getElementById('material');
+  const qtySel = document.getElementById('loadSize');
+  const priceEl = document.getElementById('price');
+  const chip = document.createElement('div'); chip.className='zone-chip';
+  (priceEl?.parentElement || qtySel.parentElement || matSel.parentElement).appendChild(chip);
+
+  function materialByLabel(label){
+    return (master.materials||[]).find(m => (m.label||'').toLowerCase() === (label||'').toLowerCase());
+  }
+  function qtyNumber(){
+    const t = String(qtySel.value||''); const m = t.match(/\d+/); return m ? Number(m[0]) : Number(t)||1;
+  }
+  function priceFor(material, zoneId, qty){
+    const tiers = material?.tiersByZone?.[zoneId] || [];
+    const t = tiers.find(tt => Number(tt.qty) === Number(qty));
+    if (!t) return null;
+    const base = Number(t.price||0);
+    const total = material.minEnabled ? Math.max(base, Number(material.minimum||0)) : base;
+    return { base, total };
+  }
+
+  // Zone picker logic + memory
+  const fab = document.getElementById('zoneFab');
+  let zoneId = localStorage.getItem(ZONE_KEY) || (master.zones?.[0]?.id || 'zone1');
+  function paintZoneButtons(){
+    fab.querySelectorAll('button[data-zone]').forEach(b=>{
+      b.classList.toggle('active', b.dataset.zone===zoneId);
+    });
+  }
+  fab.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-zone]');
+    if (!btn) return;
+    zoneId = btn.dataset.zone;
+    localStorage.setItem(ZONE_KEY, zoneId);
+    paintZoneButtons();
+    updatePrice();
+  });
+  paintZoneButtons();
+
+  function updatePrice(){
+    const matLabel = matSel.options[matSel.selectedIndex]?.text?.trim();
+    const mat = materialByLabel(matLabel);
+    const qty = qtyNumber();
+    if (!mat) {
+      chip.textContent = 'No master price for this material';
+      return;
+    }
+    const p = priceFor(mat, zoneId, qty);
+    if (!p) { chip.textContent='No price set for this qty/zone'; return; }
+    chip.textContent = `Price (from master, ${zoneId === 'zone2' ? 'Zone 2' : 'Zone 1'}): $${p.total.toFixed(0)}`;
+    if (priceEl) {
+      priceEl.value = p.total;
+      priceEl.dispatchEvent(new Event('input', {bubbles:true}));
+      priceEl.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+
+  // Update when material/qty changes
+  matSel.addEventListener('change', updatePrice);
+  qtySel.addEventListener('change', updatePrice);
+
+  // initial compute
+  updatePrice();
+})();
+</script>
+<script>
+/* Hide FAB on scroll — drop-in (no other edits needed) */
+(function(){
+  const FAB_ID = 'zoneFab';
+  const PEEK = false;            // set to true to leave a small "peek"
+  const MIN_DELTA = 6;           // how much scroll before hiding (px)
+  const TOP_BUFFER = 10;         // don't hide near very top (px)
+  const BOTTOM_BUFFER = 20;      // don't hide near very bottom (px)
+
+  const fab = document.getElementById(FAB_ID);
+  if (!fab) return;
+
+  // Inject tiny CSS
+  const style = document.createElement('style');
+  const hiddenRule = PEEK
+    ? 'transform: translateY(60%); opacity:.35;'
+    : 'transform: translateY(calc(100% + 24px)); opacity:0;';
+  style.textContent =
+    `.zone-fab{transition:transform .25s ease,opacity .2s ease;will-change:transform}
+     .zone-fab.is-hidden{${hiddenRule}pointer-events:none}
+     @media (prefers-reduced-motion: reduce){.zone-fab{transition:none}}`;
+  document.head.appendChild(style);
+
+  let lastY = window.scrollY, ticking = false;
+
+  function onScroll(){
+    const y = window.scrollY, dy = y - lastY; lastY = y;
+    const nearTop = y < TOP_BUFFER;
+    const nearBottom = (window.innerHeight + y) > (document.body.offsetHeight - BOTTOM_BUFFER);
+    const shouldHide = dy > MIN_DELTA && !nearTop && !nearBottom;
+    fab.classList.toggle('is-hidden', shouldHide);
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking){ requestAnimationFrame(onScroll); ticking = true; }
+  }, {passive:true});
+
+  // Any interaction shows it again immediately
+  ['touchstart','mousemove','focusin','click'].forEach(ev=>{
+    window.addEventListener(ev, ()=> fab.classList.remove('is-hidden'), {passive:true});
+  });
+})();
+</script>
+<script>
+/* Edit Job modal + Search filter + renderList upgrade (keeps Profit bar working) */
+(function(){
+  // --- small helpers ---
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const ensure = (id, maker) => document.getElementById(id) || maker();
+
+  // Insert a compact Search bar above the jobs list (once)
+  ensure('searchRow', () => {
+    const tabs = document.querySelector('.flex.gap-2.my-3');
+    const row = document.createElement('div');
+    row.id = 'searchRow';
+    row.className = 'mb-3';
+    row.innerHTML = `
+      <input id="searchJobs" class="w-full rounded-xl border px-3 py-2"
+             placeholder="Search jobs (name, address, material, status)"/>
+    `;
+    (tabs?.parentElement || document.body).insertBefore(row, document.getElementById('list'));
+    return row;
+  });
+
+  // Search state
+  function searchTerm(){
+    return (document.getElementById('searchJobs')?.value || '').trim().toLowerCase();
+  }
+  document.getElementById('searchJobs')?.addEventListener('input', ()=>{
+    if (typeof window.renderList === 'function') window.renderList();
+  });
+
+  // --- Edit modal UI (once) ---
+  ensure('editJobModal', () => {
+    const m = document.createElement('div');
+    m.id = 'editJobModal';
+    m.style.cssText = 'position:fixed;inset:0;display:none;z-index:10000;background:rgba(0,0,0,.4);';
+    m.innerHTML = `
+      <div style="position:absolute;left:12px;right:12px;top:10%;margin:auto;max-width:720px;background:#fff;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.25)">
+        <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:800">Edit Job</div>
+          <div>
+            <button id="editCancel" class="rounded-xl border px-3 py-1 mr-2">Cancel</button>
+            <button id="editSave" class="rounded-xl px-3 py-1 text-white" style="background:#111">Save</button>
+          </div>
+        </div>
+        <div style="padding:12px 16px">
+          <div class="grid grid-cols-2 gap-2">
+            <input id="e_date" class="rounded-xl border px-3 py-2" placeholder="Date (YYYY-MM-DD)" />
+            <input id="e_time" class="rounded-xl border px-3 py-2" placeholder="Time (e.g., 10:30 AM)" />
+            <input id="e_customer" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Customer name" />
+            <input id="e_address" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Address" />
+            <select id="e_material" class="rounded-xl border px-3 py-2"></select>
+            <input id="e_loadSize" type="number" min="0" step="0.01" class="rounded-xl border px-3 py-2" placeholder="Tons/Yards" />
+            <input id="e_price" type="number" min="0" step="0.01" class="rounded-xl border px-3 py-2" placeholder="Price" />
+            <select id="e_status" class="rounded-xl border px-3 py-2">
+              <option>Scheduled</option><option>In Progress</option><option>Complete</option><option>Canceled</option>
+            </select>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    return m;
+  });
+
+  let editingId = null;
+
+  function openEdit(job){
+    editingId = job.id;
+    // material options from your main selector (keeps list in sync)
+    const srcSel = document.getElementById('material');
+    const eMat = document.getElementById('e_material'); eMat.innerHTML = '';
+    if (srcSel) {
+      Array.from(srcSel.options).forEach(o=>{
+        if (!o.value && !o.textContent.trim()) return;
+        const opt = document.createElement('option');
+        opt.value = o.textContent.trim();
+        opt.textContent = o.textContent.trim();
+        eMat.appendChild(opt);
+      });
+    } else {
+      // fallback
+      ['Crush & Run','#57 Stone','Clean Sand','Sand Clay','Fill Dirt','Top Soil','#4 Stone']
+      .forEach(t=>{ const opt=document.createElement('option'); opt.value=t; opt.textContent=t; eMat.appendChild(opt); });
+    }
+
+    // fill fields
+    document.getElementById('e_date').value = job.date || '';
+    document.getElementById('e_time').value = job.time || '';
+    document.getElementById('e_customer').value = job.customer || '';
+    document.getElementById('e_address').value = job.address || '';
+    document.getElementById('e_material').value = job.material || '';
+    document.getElementById('e_loadSize').value = job.loadSize || '';
+    document.getElementById('e_price').value = job.price || '';
+    document.getElementById('e_status').value = job.status || 'Scheduled';
+
+    document.getElementById('editJobModal').style.display = 'block';
+  }
+  function closeEdit(){ document.getElementById('editJobModal').style.display = 'none'; editingId=null; }
+
+  document.getElementById('editCancel').onclick = closeEdit;
+  document.getElementById('editSave').onclick = () => {
+    if (!editingId) return closeEdit();
+    const idx = (window.jobs||[]).findIndex(j => j.id === editingId);
+    if (idx === -1) return closeEdit();
+
+    const j = window.jobs[idx];
+    j.date     = document.getElementById('e_date').value.trim() || j.date;
+    j.time     = document.getElementById('e_time').value.trim();
+    j.customer = document.getElementById('e_customer').value.trim();
+    j.address  = document.getElementById('e_address').value.trim();
+    j.material = document.getElementById('e_material').value;
+    j.loadSize = document.getElementById('e_loadSize').value ? parseFloat(document.getElementById('e_loadSize').value) : '';
+    j.price    = document.getElementById('e_price').value ? parseFloat(document.getElementById('e_price').value) : '';
+    j.status   = document.getElementById('e_status').value || j.status;
+
+    if (typeof window.saveJobs === 'function') window.saveJobs();
+    if (typeof window.renderList === 'function') window.renderList();
+    closeEdit();
+  };
+
+  // Keep reference to any existing profit refresher
+  const refreshProfit = window.refreshProfit || function(){};
+
+  // Replace renderList with an enhanced version (adds Edit + search filter)
+  window.renderList = function(){
+    const list = document.getElementById('list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // Start from your existing filtered view (tab logic)
+    let items = (typeof window.filteredJobs === 'function') ? window.filteredJobs() : (window.jobs||[]);
+
+    // Apply search filter
+    const term = searchTerm();
+    if (term) {
+      items = items.filter(j => {
+        const hay = [
+          j.customer||'',
+          j.address||'',
+          j.material||'',
+          j.status||'',
+          j.price!=null ? String(j.price) : ''
+        ].join(' ').toLowerCase();
+        return hay.includes(term);
+      });
+    }
+
+    if (!items.length){
+      const div=document.createElement('div');
+      div.className='text-center text-gray-500';
+      div.textContent='No jobs here yet.';
+      list.appendChild(div);
+      refreshProfit();
+      return;
+    }
+
+    for (const job of items){
+      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
+      const row=document.createElement('div'); row.className='flex justify-between items-center';
+
+      const left=document.createElement('div');
+      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
+      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=(job.date||'')+' '+(job.time||'');
+      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address||'';
+      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
+      meta.textContent=[job.material, job.loadSize? (job.loadSize+' tons'):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+
+      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
+
+      const actions=document.createElement('div'); actions.className='flex gap-2';
+      const editBtn=document.createElement('button'); editBtn.className='rounded-xl px-3 py-1 border text-sm'; editBtn.textContent='Edit';
+      editBtn.onclick=()=>openEdit(job);
+
+      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)';
+      goBtn.textContent='GO'; goBtn.onclick=()=>{ if (typeof window.openAppleMaps==='function') window.openAppleMaps(window.selectedHub, job.address); };
+
+      actions.appendChild(editBtn); actions.appendChild(goBtn);
+
+      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
+      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===(job.status||'Scheduled')) o.selected=true; statusSel.appendChild(o); });
+      statusSel.onchange=()=>{ job.status=statusSel.value; if (typeof window.saveJobs==='function') window.saveJobs(); window.renderList(); };
+
+      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
+      delBtn.onclick=()=>{ window.jobs = (window.jobs||[]).filter(j => j.id !== job.id); if (typeof window.saveJobs==='function') window.saveJobs(); window.renderList(); };
+
+      right.appendChild(actions);
+      right.appendChild(statusSel);
+      right.appendChild(delBtn);
+
+      row.appendChild(left); row.appendChild(right);
+      card.appendChild(row);
+      list.appendChild(card);
+    }
+
+    // keep any attached summaries/profit bars up to date
+    refreshProfit();
+  };
+
+  // Initial paint, if jobs already present
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ()=> window.renderList && window.renderList());
   } else {
     window.renderList && window.renderList();
   }
 })();
 </script>
+<script>
+/* Drag to Reorder jobs — touch & mouse, per-day, persists in localStorage */
+(function(){
+  const ORDER_KEY = 'DT_ORDER_V1';
+
+  // ---------- tiny helpers ----------
+  const $  = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const getJobById = id => (window.jobs||[]).find(j => j.id === id) || null;
+
+  function loadOrder(){
+    try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '{}'); } catch { return {}; }
+  }
+  function saveOrder(obj){
+    localStorage.setItem(ORDER_KEY, JSON.stringify(obj));
+  }
+  function orderFor(date){
+    const o = loadOrder();
+    return (o && o[date]) ? o[date] : [];
+  }
+  function setOrderFor(date, ids){
+    const o = loadOrder();
+    o[date] = ids;
+    saveOrder(o);
+  }
+
+  // Reapply stored order within the current list (per date)
+  function applyStoredOrder(){
+    const list = $('#list');
+    if (!list) return;
+
+    // Ensure each card has data-id and data-date
+    $$('#list [data-id]').forEach(card => {
+      const id = card.dataset.id;
+      const job = getJobById(id);
+      if (job) card.dataset.date = job.date || '';
+    });
+
+    // Group cards by date and reorder inside each group
+    const groups = {};
+    $$('#list [data-id]').forEach(card => {
+      const d = card.dataset.date || '';
+      (groups[d] ||= []).push(card);
+    });
+
+    for (const [date, cards] of Object.entries(groups)){
+      const ids = orderFor(date);
+      if (!ids.length) continue;
+
+      // Sort cards by stored order; keep unknowns at the end (stable)
+      cards.sort((a,b)=>{
+        const ia = ids.indexOf(a.dataset.id);
+        const ib = ids.indexOf(b.dataset.id);
+        return (ia===-1 && ib===-1) ? 0 : (ia===-1 ? 1 : (ib===-1 ? -1 : ia-ib));
+      });
+
+      // Reinsert in the DOM in the new order (keeping other-date cards untouched)
+      // We insert in place by walking the whole list and moving this date's cards in sequence.
+      let anchor = null;
+      for (const card of cards){
+        // Find next position after the last placed card of this date,
+        // otherwise before the next card with a different date boundary.
+        if (anchor) {
+          anchor.after(card);
+        } else {
+          // place the first card where it currently is (acts as anchor), then move others after it
+          anchor = card;
+        }
+        anchor = card;
+      }
+    }
+  }
+
+  // ---------- drag logic ----------
+  let dragging = null;   // { card, id, date, placeholder }
+  let moveHandler, upHandler;
+
+  // a light placeholder with same height as the card being moved
+  function makePlaceholder(h){
+    const ph = document.createElement('div');
+    ph.className = 'drag-ph';
+    ph.style.height = h + 'px';
+    ph.style.border = '2px dashed #d1d5db';
+    ph.style.borderRadius = '12px';
+    ph.style.margin = '4px 0';
+    return ph;
+  }
+
+  function pointerDown(e){
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+
+    const card = handle.closest('[data-id]');
+    if (!card) return;
+
+    const id = card.dataset.id;
+    const job = getJobById(id);
+    if (!job) return;
+
+    // Lock to SAME DATE only
+    const date = job.date || '';
+
+    // Prepare drag
+    e.preventDefault();
+    card.classList.add('dragging');
+    const ph = makePlaceholder(card.offsetHeight);
+    card.parentElement.insertBefore(ph, card.nextSibling);
+
+    dragging = { card, id, date, placeholder: ph };
+
+    // Pointer capture (works on mouse & touch)
+    moveHandler = pointerMove;
+    upHandler = pointerUp;
+    window.addEventListener('pointermove', moveHandler);
+    window.addEventListener('pointerup', upHandler);
+  }
+
+  function pointerMove(e){
+    if (!dragging) return;
+
+    const { card, date, placeholder } = dragging;
+
+    // Card follows finger a bit (optional visual)
+    card.style.opacity = '0.6';
+
+    // Find element under pointer
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const overCard = el && el.closest('#list [data-id]');
+    if (!overCard || overCard === card) return;
+
+    // Only allow dropping among the same date
+    if ((overCard.dataset.date||'') !== date) return;
+
+    const r = overCard.getBoundingClientRect();
+    const before = e.clientY < r.top + r.height/2;
+
+    if (before) {
+      overCard.parentElement.insertBefore(placeholder, overCard);
+    } else {
+      overCard.parentElement.insertBefore(placeholder, overCard.nextSibling);
+    }
+  }
+
+  function pointerUp(){
+    if (!dragging) return;
+    const { card, id, date, placeholder } = dragging;
+
+    // Place card where placeholder is
+    placeholder.parentElement.insertBefore(card, placeholder);
+    card.classList.remove('dragging');
+    card.style.opacity = '';
+    placeholder.remove();
+
+    // Persist new order for that date (only visible cards of same date)
+    const ids = $$('#list [data-id]').filter(c => (c.dataset.date||'')===date).map(c => c.dataset.id);
+    setOrderFor(date, ids);
+
+    // Cleanup
+    dragging = null;
+    window.removeEventListener('pointermove', moveHandler);
+    window.removeEventListener('pointerup', upHandler);
+  }
+
+  // Attach handles & listeners after each list render
+  function attachDrag(){
+    const list = $('#list');
+    if (!list) return;
+
+    // Ensure each card has data-id/date and a handle
+    $$('#list > div').forEach(card => {
+      const id = card.dataset.id || null;
+      if (!id) return;
+      const job = getJobById(id);
+      if (job) card.dataset.date = job.date || '';
+
+      // Add a handle if missing
+      if (!card.querySelector('.drag-handle')) {
+        const rightCol = card.querySelector('.flex.flex-col.gap-2.items-end') || card;
+        const h = document.createElement('button');
+        h.type = 'button';
+        h.className = 'drag-handle rounded-xl border px-2 py-1 text-sm';
+        h.title = 'Drag to reorder (same day)';
+        h.textContent = '↕︎';
+        // Put the handle above the actions if possible
+        rightCol.insertBefore(h, rightCol.firstChild);
+      }
+    });
+
+    // Global pointerdown on handles
+    list.removeEventListener('pointerdown', pointerDown);
+    list.addEventListener('pointerdown', pointerDown, { passive:false });
+
+    // Apply stored order (per day) to the freshly rendered list
+    applyStoredOrder();
+  }
+
+  // Minimal styling for dragging state
+  const style = document.createElement('style');
+  style.textContent = `
+    #list .dragging{ outline:2px solid #93c5fd; border-radius:12px; }
+    #list .drag-handle{ background:#fff }
+    @media (hover:hover){
+      #list .drag-handle{ cursor:grab }
+      #list .drag-handle:active{ cursor:grabbing }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Hook into your renderList so drag is re-wired every time
+  const origRender = window.renderList;
+  if (typeof origRender === 'function'){
+    window.renderList = function(){ origRender.apply(this, arguments); attachDrag(); };
+  } else {
+    // If renderList isn't defined yet, try after DOM ready, then watch for later calls
+    document.addEventListener('DOMContentLoaded', attachDrag);
+    // Also re-run when jobs change via storage (another tab)
+    window.addEventListener('storage', e => { if (e.key==='dt_jobs') attachDrag(); });
+  }
+})();
+</script>
+
+</body>
+</html>
