@@ -209,3 +209,157 @@ renderList();
 </script>
 </body>
 </html>
+<script>
+/* Robust receipt: handles popup blockers + missing job gracefully */
+(function(){
+  // keep your header text here (edit if needed)
+  const COMPANY_NAME  = "Augusta Sand & Gravel";
+  const COMPANY_TAG   = "Material Hauling";
+  const COMPANY_PHONE = "";
+
+  const fmt = v => (isFinite(v) ? Number(v).toFixed(2) : "");
+  const todayStr = () => new Date().toISOString().slice(0,10);
+  const clean = s => (s||"").toString().trim().replace(/\s+/g,"_").replace(/[^a-z0-9_\-]/gi,"");
+
+  // Replace or define generateReceipt
+  window.generateReceipt = function(idOrJob){
+    // Resolve the job: support passing id or the job object
+    let job = null;
+    if (idOrJob && typeof idOrJob === "object") {
+      job = idOrJob;
+    } else {
+      const id = String(idOrJob ?? "");
+      job = (window.jobs || []).find(j => String(j.id) === id) || null;
+    }
+    if (!job) {
+      alert("Couldn't find that job. Try refreshing the page.");
+      return;
+    }
+
+    const qty = Number(job.loadSize ?? job.tons ?? 0);
+    const existingTotal = Number(job.price ?? job.customTotal ?? 0);
+    const derivedUnit = (qty>0 && isFinite(existingTotal) && existingTotal>0)
+      ? (existingTotal/qty)
+      : Number(job.pricePerTon ?? 0);
+
+    // Ask for $/unit
+    const unitPrompt = prompt("Price per unit ($/ton). Leave blank to use current:", derivedUnit ? derivedUnit.toFixed(2) : "");
+    const unitPrice  = unitPrompt === null
+      ? (derivedUnit || 0)
+      : (unitPrompt.trim()==="" ? (derivedUnit||0) : Number(unitPrompt));
+
+    // Auto total → allow override
+    const autoTotal   = (isFinite(qty) && isFinite(unitPrice)) ? (qty * unitPrice) : (existingTotal || 0);
+    const totalPrompt = prompt("Total price ($). You can override:", fmt(autoTotal));
+    const grandTotal  = totalPrompt === null ? autoTotal : (Number(totalPrompt)||0);
+
+    const method = prompt("Payment method (Cash, CashApp, Venmo, Zelle, Card):", "Cash") || "Cash";
+    const notes  = prompt("Notes (optional):", "") || "";
+
+    const fileName = `ASG_Receipt_${todayStr()}_${clean(job.customer||"Customer")}.pdf`;
+    const css = `
+      *{box-sizing:border-box}
+      body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;padding:24px;color:#111}
+      h1{margin:0;font-size:22px}
+      h2{margin:2px 0 12px;color:#475569;font-size:12px}
+      .row{display:flex;gap:16px;margin-top:10px}
+      .col{flex:1}
+      table{width:100%;border-collapse:collapse;margin-top:12px}
+      th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;font-size:12px}
+      thead{background:#f8fafc}
+      .muted{color:#64748b;font-size:12px;margin-top:8px}
+    `;
+
+    const html = `
+      <!doctype html><html>
+        <head><meta charset="utf-8"><title>${fileName}</title><style>${css}</style></head>
+        <body>
+          <h1>${COMPANY_NAME}</h1>
+          <h2>${[COMPANY_TAG, COMPANY_PHONE].filter(Boolean).join(" • ")}</h2>
+
+          <div class="row">
+            <div class="col"><strong>Customer:</strong> ${job.customer||""}</div>
+            <div class="col"><strong>Date:</strong> ${job.date||todayStr()} ${job.time||""}</div>
+          </div>
+
+          <table>
+            <thead>
+              <tr><th>Material</th><th>Quantity</th><th>Unit</th><th>Price/Unit</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${job.material || ""}</td>
+                <td>${qty || ""}</td>
+                <td>tons</td>
+                <td>$${fmt(unitPrice)}</td>
+                <td>$${fmt(grandTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="row" style="margin-top:8px">
+            <div class="col"><strong>Address:</strong><br>${job.address||""}</div>
+            <div class="col"><strong>Payment Method:</strong> ${method}</div>
+          </div>
+
+          <p class="muted">Notes: ${notes || "—"}</p>
+          <p class="muted">Thank you for your business!</p>
+          <script>window.print();<\/script>
+        </body>
+      </html>
+    `;
+
+    // Open in a user-gesture to avoid popup blockers
+    const w = window.open("", "_blank"); 
+    if (!w || w.closed || typeof w.closed === "undefined") {
+      alert("Your browser blocked the receipt window. Please allow pop‑ups for this site and try again.");
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
+  // Reattach buttons in case your renderList didn't wire them
+  function attachReceiptButtons(){
+    const list = document.getElementById("list");
+    if (!list) return;
+    const cards = Array.from(list.children).filter(el => el && el.nodeType === 1);
+    const visible = (typeof window.filteredJobs === "function") ? window.filteredJobs() : (window.jobs || []);
+
+    cards.forEach((card, idx) => {
+      if (card.querySelector(".btn-receipt")) return;
+
+      const rightCol = card.querySelector(".flex.flex-col.gap-2.items-end") || card;
+      const actions  = rightCol.querySelector("div.flex.gap-2") || rightCol;
+
+      const btn = document.createElement("button");
+      btn.className = "btn-receipt rounded-xl px-3 py-1 border text-sm";
+      btn.textContent = "Receipt";
+
+      // resolve job by data-id or by visible index (fallback)
+      let job = null;
+      const id = card.dataset && card.dataset.id;
+      if (id && Array.isArray(window.jobs)) job = window.jobs.find(j => String(j.id) === String(id)) || null;
+      if (!job) job = visible[idx] || null;
+
+      btn.onclick = () => window.generateReceipt(job || (id ?? null));
+      actions.insertBefore(btn, actions.firstChild || null);
+    });
+  }
+
+  // Wrap renderList so every render adds buttons
+  const origRender = window.renderList;
+  window.renderList = function(){
+    if (typeof origRender === "function") origRender.apply(this, arguments);
+    attachReceiptButtons();
+  };
+
+  // Run once on load
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", attachReceiptButtons);
+  } else {
+    attachReceiptButtons();
+  }
+})();
+</script>
