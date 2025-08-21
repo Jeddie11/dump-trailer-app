@@ -1,209 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hauling App (Skeleton)</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;margin:20px;color:#111;background:#fafafa}
-    .wrap{max-width:780px;margin:auto}
-    h1{margin:0 0 16px}
-    .job{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .row{display:flex;gap:8px;flex-wrap:wrap}
-    .muted{color:#6b7280;font-size:12px}
-    .btn{border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:6px 10px;font-weight:600;cursor:pointer}
-    .btn.primary{background:#111;color:#fff;border-color:#111}
-    label{font-size:12px;color:#374151}
-    input{border:1px solid #d1d5db;border-radius:10px;padding:6px 10px}
-    .pill{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:2px 8px;font-size:12px}
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hauling Job Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="wrap">
-    <h1>Hauling Job Manager</h1>
-    <p class="muted">Demo skeleton with auto‑calculating receipts + optional custom totals (no tax).</p>
+<body class="bg-gray-100 text-gray-900">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-4">Hauling Job Manager</h1>
 
-    <div id="jobList"></div>
-
-    <hr style="margin:20px 0;border:none;border-top:1px solid #e5e7eb">
-    <div class="row">
-      <div>
-        <label>Quick add (demo)</label><br>
-        <input id="nameI" placeholder="Customer" />
-        <input id="matI" placeholder="Material" />
-        <input id="tonsI" type="number" step="0.01" placeholder="Tons" style="width:100px" />
-        <input id="ppI" type="number" step="0.01" placeholder="$/ton" style="width:100px" />
-        <button class="btn primary" id="addBtn">Add Job</button>
+    <!-- Job Form -->
+    <div class="bg-white p-4 rounded-xl shadow mb-6">
+      <h2 class="text-lg font-semibold mb-2">Add Job</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <input id="customer" placeholder="Customer Name" class="border rounded-lg p-2">
+        <input id="address" placeholder="Address" class="border rounded-lg p-2">
+        <input id="material" placeholder="Material" class="border rounded-lg p-2">
+        <input id="tons" type="number" placeholder="Tons" class="border rounded-lg p-2">
+        <input id="pricePerTon" type="number" placeholder="Price per Ton" class="border rounded-lg p-2">
+        <select id="status" class="border rounded-lg p-2">
+          <option>Scheduled</option>
+          <option>In Progress</option>
+          <option>Complete</option>
+          <option>Canceled</option>
+        </select>
       </div>
+      <button onclick="addJob()" class="mt-3 bg-black text-white px-4 py-2 rounded-lg">Add Job</button>
+    </div>
+
+    <!-- Job List -->
+    <div id="jobList" class="space-y-4"></div>
+
+    <!-- Profit Tracker -->
+    <div class="mt-6 bg-white p-4 rounded-xl shadow">
+      <h2 class="text-lg font-semibold">Profit Tracker</h2>
+      <p class="mt-2">Completed Profit: <span id="profit" class="font-bold">$0</span></p>
     </div>
   </div>
 
   <script>
-  /* -------------------------
-     Minimal job data + UI
-  --------------------------*/
-  let jobs = [
-    { id: crypto.randomUUID(), customer: "John Smith",  material: "Crush & Run", tons: 3, pricePerTon: 60, customTotal: null, address:"123 Oak Ln, Evans, GA", time:"" },
-    { id: crypto.randomUUID(), customer: "Mary Jones",  material: "#57 Stone",  tons: 4, pricePerTon: 70, customTotal: null, address:"45 Maple Dr, Appling, GA", time:"" }
-  ];
+    let jobs = [];
 
-  function computeTotal(job){
-    return (job.customTotal != null && !isNaN(job.customTotal))
-      ? Number(job.customTotal)
-      : Number(job.tons||0) * Number(job.pricePerTon||0);
-  }
+    function renderJobs() {
+      const jobList = document.getElementById("jobList");
+      jobList.innerHTML = "";
+      let profit = 0;
 
-  function renderList(){
-    const el = document.getElementById("jobList");
-    el.innerHTML = "";
-    jobs.forEach(job => {
-      const div = document.createElement("div");
-      div.className = "job";
-      const total = computeTotal(job);
-      div.innerHTML = `
-        <div class="row" style="justify-content:space-between;align-items:center">
+      jobs.forEach((job, index) => {
+        if (job.status === "Complete") {
+          profit += (job.tons * job.pricePerTon) - (job.tons * job.costPerTon);
+        }
+
+        const jobDiv = document.createElement("div");
+        jobDiv.className = "bg-white p-4 rounded-xl shadow flex justify-between items-center";
+        jobDiv.innerHTML = `
           <div>
-            <div style="font-weight:700">${job.customer}</div>
-            <div class="muted">${job.material} • ${job.tons} tons • $${Number(job.pricePerTon||0).toFixed(2)}/ton</div>
-            ${job.customTotal!=null ? `<div class="pill">Custom total set</div>` : ""}
+            <div class="font-semibold">${job.customer}</div>
+            <div class="text-sm text-gray-600">${job.material} • ${job.tons} tons @ $${job.pricePerTon}/ton</div>
+            <div class="text-xs text-gray-500">Status: ${job.status}</div>
           </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn" onclick="setCustom(${JSON.stringify(job.id)})">Set Custom Total</button>
-            <button class="btn" onclick="clearCustom(${JSON.stringify(job.id)})">Clear Custom</button>
-            <button class="btn primary" onclick="generateReceipt(${JSON.stringify(job.id)})">Receipt</button>
-          </div>
-        </div>
-        <div class="muted" style="margin-top:6px">Current total: <strong>$${isFinite(total)?total.toFixed(2):""}</strong></div>
-      `;
-      el.appendChild(div);
-    });
-  }
+          <button onclick="removeJob(${index})" class="text-red-600">✕</button>
+        `;
+        jobList.appendChild(jobDiv);
+      });
 
-  document.getElementById("addBtn").onclick = ()=>{
-    const name = document.getElementById("nameI").value.trim() || "Customer";
-    const mat  = document.getElementById("matI").value.trim()  || "Material";
-    const tons = Number(document.getElementById("tonsI").value || 0);
-    const pp   = Number(document.getElementById("ppI").value   || 0);
-    jobs.unshift({ id: crypto.randomUUID(), customer:name, material:mat, tons, pricePerTon:pp, customTotal:null, address:"", time:"" });
-    renderList();
-    ["nameI","matI","tonsI","ppI"].forEach(id=>document.getElementById(id).value="");
-  };
+      document.getElementById("profit").innerText = "$" + profit.toFixed(2);
+    }
 
-  function setCustom(id){
-    const j = jobs.find(x=>x.id===id); if(!j) return;
-    const v = prompt("Custom total ($). Leave blank to cancel:", j.customTotal!=null?String(j.customTotal):"");
-    if (v===null) return;
-    const n = Number(v);
-    if (isNaN(n)) { alert("Not a number."); return; }
-    j.customTotal = n;
-    renderList();
-  }
-  function clearCustom(id){
-    const j = jobs.find(x=>x.id===id); if(!j) return;
-    j.customTotal = null;
-    renderList();
-  }
-  </script>
+    function addJob() {
+      const customer = document.getElementById("customer").value;
+      const address = document.getElementById("address").value;
+      const material = document.getElementById("material").value;
+      const tons = parseFloat(document.getElementById("tons").value);
+      const pricePerTon = parseFloat(document.getElementById("pricePerTon").value);
+      const status = document.getElementById("status").value;
+      
+      // Quarry baseline costs (from your locked-in sheet)
+      const quarryCosts = { "Crush & Run": 23, "#57 Stone": 29, "Fill Dirt": 10, "Topsoil": 0 };
+      const costPerTon = quarryCosts[material] || 0;
 
-  <!-- Robust receipt (popup‑safe) placed right before </body> -->
-  <script>
-  (function(){
-    const COMPANY_NAME  = "Augusta Sand & Gravel";
-    const COMPANY_TAG   = "Material Hauling";
-    const COMPANY_PHONE = "";
-
-    const fmt = v => (isFinite(v) ? Number(v).toFixed(2) : "");
-    const todayStr = () => new Date().toISOString().slice(0,10);
-    const clean = s => (s||"").toString().trim().replace(/\s+/g,"_").replace(/[^a-z0-9_\-]/gi,"");
-
-    window.generateReceipt = function(id){
-      const job = (window.jobs || []).find(j=>String(j.id)===String(id));
-      if(!job){ alert("Job not found"); return; }
-
-      const qty = Number(job.loadSize ?? job.tons ?? 0);
-      const existingTotal = Number(job.price ?? job.customTotal ?? 0);
-      const derivedUnit = (qty>0 && isFinite(existingTotal) && existingTotal>0)
-        ? (existingTotal/qty)
-        : Number(job.pricePerTon ?? 0);
-
-      const unitPrompt = prompt("Price per unit ($/ton). Leave blank to use current:", derivedUnit ? derivedUnit.toFixed(2) : "");
-      const unitPrice  = unitPrompt === null
-        ? (derivedUnit || 0)
-        : (unitPrompt.trim()==="" ? (derivedUnit||0) : Number(unitPrompt));
-
-      const autoTotal   = (isFinite(qty) && isFinite(unitPrice)) ? (qty * unitPrice) : (existingTotal || 0);
-      const totalPrompt = prompt("Total price ($). You can override:", fmt(autoTotal));
-      const grandTotal  = totalPrompt === null ? autoTotal : (Number(totalPrompt)||0);
-
-      const method = prompt("Payment method (Cash, CashApp, Venmo, Zelle, Card):", "Cash") || "Cash";
-      const notes  = prompt("Notes (optional):", "") || "";
-
-      const fileName = `ASG_Receipt_${todayStr()}_${clean(job.customer||"Customer")}.pdf`;
-      const css = `
-        *{box-sizing:border-box}
-        body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;padding:24px;color:#111}
-        h1{margin:0;font-size:22px}
-        h2{margin:2px 0 12px;color:#475569;font-size:12px}
-        .row{display:flex;gap:16px;margin-top:10px}
-        .col{flex:1}
-        table{width:100%;border-collapse:collapse;margin-top:12px}
-        th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;font-size:12px}
-        thead{background:#f8fafc}
-        .muted{color:#64748b;font-size:12px;margin-top:8px}
-      `;
-
-      const html = `
-        <!doctype html><html>
-          <head><meta charset="utf-8"><title>${fileName}</title><style>${css}</style></head>
-          <body>
-            <h1>${COMPANY_NAME}</h1>
-            <h2>${[COMPANY_TAG, COMPANY_PHONE].filter(Boolean).join(" • ")}</h2>
-
-            <div class="row">
-              <div class="col"><strong>Customer:</strong> ${job.customer||""}</div>
-              <div class="col"><strong>Date:</strong> ${todayStr()} ${job.time||""}</div>
-            </div>
-
-            <table>
-              <thead>
-                <tr><th>Material</th><th>Quantity</th><th>Unit</th><th>Price/Unit</th><th>Total</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>${job.material || ""}</td>
-                  <td>${qty || ""}</td>
-                  <td>tons</td>
-                  <td>$${fmt(unitPrice)}</td>
-                  <td>$${fmt(grandTotal)}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div class="row" style="margin-top:8px">
-              <div class="col"><strong>Address:</strong><br>${job.address||""}</div>
-              <div class="col"><strong>Payment Method:</strong> ${method}</div>
-            </div>
-
-            <p class="muted">Notes: ${notes || "—"}</p>
-            <p class="muted">Thank you for your business!</p>
-            <script>window.print();<\/script>
-          </body>
-        </html>
-      `;
-
-      const w = window.open("", "_blank");
-      if (!w || w.closed || typeof w.closed === "undefined") {
-        alert("Your browser blocked the receipt window. Please allow pop‑ups for this site and try again.");
+      if (!customer || !material || isNaN(tons) || isNaN(pricePerTon)) {
+        alert("Please fill all fields.");
         return;
       }
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-    };
 
-    // initial paint for the list (keep here so this script runs after main code)
-    if (typeof window.renderList === "function") window.renderList();
-  })();
+      jobs.push({ customer, address, material, tons, pricePerTon, costPerTon, status });
+      renderJobs();
+
+      // clear form
+      ["customer","address","material","tons","pricePerTon"].forEach(id => document.getElementById(id).value = "");
+    }
+
+    function removeJob(index) {
+      jobs.splice(index, 1);
+      renderJobs();
+    }
+
+    renderJobs();
   </script>
 </body>
 </html>
