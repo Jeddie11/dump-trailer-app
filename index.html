@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dump Trailer — iPhone</title>
+  <title>Augusta Sand & Gravel — iPhone</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#000000">
@@ -14,16 +14,22 @@
     /* Splash overlay */
     #splash { position: fixed; inset: 0; background: #000; display: flex;
       align-items: center; justify-content: center; z-index: 50; transition: opacity .4s ease; }
-    #splash svg { color: var(--brand-yellow); width: 96px; height: 96px; }
+    #splash img { width: 96px; height: 96px; }
     #splash.hide { opacity: 0; pointer-events: none; }
   </style>
+
+  <!-- ASG app icons & manifest -->
+  <link rel="manifest" href="./manifest.webmanifest?v=1">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/asg-icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./icons/asg-icon-16.png">
+  <link rel="apple-touch-icon" href="./icons/asg-icon-180.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="./icons/asg-icon-152.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="./icons/asg-icon-167.png">
 </head>
 <body class="bg-gray-50">
-  <!-- Splash screen (logo on black) -->
+  <!-- Splash screen (ASG logo on black) -->
   <div id="splash" aria-hidden="true">
-    <svg viewBox="0 0 64 64" fill="currentColor" aria-label="Dump Trailer">
-      <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
-    </svg>
+    <img src="./icons/asg-icon-384.png" alt="Augusta Sand & Gravel">
   </div>
 
   <div class="min-h-screen p-3 sm:p-4 max-w-xl mx-auto">
@@ -33,7 +39,7 @@
         <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
       </svg>
       <div>
-        <div class="text-xl font-semibold leading-tight">Dump Trailer</div>
+        <div class="text-xl font-semibold leading-tight">Augusta Sand & Gravel</div>
         <div class="text-xs opacity-80">Hub → Customer • Apple Maps</div>
       </div>
     </header>
@@ -45,7 +51,7 @@
         <select id="hubSelect" class="flex-1 rounded-xl border px-3 py-2"></select>
       </div>
 
-      <!-- Admin card (replaces Add Hub box) -->
+      <!-- Admin card -->
       <div class="rounded-2xl bg-white border shadow p-3">
         <div class="font-semibold text-base">Admin</div>
         <p class="text-sm text-gray-600 mb-2">Manage materials, zones, and pricing.</p>
@@ -133,7 +139,7 @@
   function readLS(k,f){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} }
   function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 
-  // Keep per-ton fallback rates for materials that aren’t in the master sheet
+  // Fallback per-ton rates (only used if Zone picker didn't fill price)
   const PRICE_PER_TON = {"Crush & Run":60,"#57 Stone":70,"Clean Sand":65,"Top Soil":60,"#4 Stone":70,"Sand Clay":null,"Fill Dirt":null};
 
   // ---------- app state ----------
@@ -587,7 +593,7 @@
     let items = (typeof window.filteredJobs === 'function') ? window.filteredJobs() : (window.jobs||[]);
 
     // Apply search filter
-    const term = searchTerm();
+    const term = (document.getElementById('searchJobs')?.value || '').trim().toLowerCase();
     if (term) {
       items = items.filter(j => {
         const hay = [
@@ -718,15 +724,11 @@
       });
 
       // Reinsert in the DOM in the new order (keeping other-date cards untouched)
-      // We insert in place by walking the whole list and moving this date's cards in sequence.
       let anchor = null;
       for (const card of cards){
-        // Find next position after the last placed card of this date,
-        // otherwise before the next card with a different date boundary.
         if (anchor) {
           anchor.after(card);
         } else {
-          // place the first card where it currently is (acts as anchor), then move others after it
           anchor = card;
         }
         anchor = card;
@@ -738,7 +740,6 @@
   let dragging = null;   // { card, id, date, placeholder }
   let moveHandler, upHandler;
 
-  // a light placeholder with same height as the card being moved
   function makePlaceholder(h){
     const ph = document.createElement('div');
     ph.className = 'drag-ph';
@@ -760,10 +761,8 @@
     const job = getJobById(id);
     if (!job) return;
 
-    // Lock to SAME DATE only
     const date = job.date || '';
 
-    // Prepare drag
     e.preventDefault();
     card.classList.add('dragging');
     const ph = makePlaceholder(card.offsetHeight);
@@ -771,7 +770,6 @@
 
     dragging = { card, id, date, placeholder: ph };
 
-    // Pointer capture (works on mouse & touch)
     moveHandler = pointerMove;
     upHandler = pointerUp;
     window.addEventListener('pointermove', moveHandler);
@@ -783,15 +781,12 @@
 
     const { card, date, placeholder } = dragging;
 
-    // Card follows finger a bit (optional visual)
     card.style.opacity = '0.6';
 
-    // Find element under pointer
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const overCard = el && el.closest('#list [data-id]');
     if (!overCard || overCard === card) return;
 
-    // Only allow dropping among the same date
     if ((overCard.dataset.date||'') !== date) return;
 
     const r = overCard.getBoundingClientRect();
@@ -808,35 +803,31 @@
     if (!dragging) return;
     const { card, id, date, placeholder } = dragging;
 
-    // Place card where placeholder is
     placeholder.parentElement.insertBefore(card, placeholder);
     card.classList.remove('dragging');
     card.style.opacity = '';
     placeholder.remove();
 
-    // Persist new order for that date (only visible cards of same date)
-    const ids = $$('#list [data-id]').filter(c => (c.dataset.date||'')===date).map(c => c.dataset.id);
+    const ids = Array.from(document.querySelectorAll('#list [data-id]'))
+      .filter(c => (c.dataset.date||'')===date)
+      .map(c => c.dataset.id);
     setOrderFor(date, ids);
 
-    // Cleanup
     dragging = null;
     window.removeEventListener('pointermove', moveHandler);
     window.removeEventListener('pointerup', upHandler);
   }
 
-  // Attach handles & listeners after each list render
   function attachDrag(){
     const list = $('#list');
     if (!list) return;
 
-    // Ensure each card has data-id/date and a handle
-    $$('#list > div').forEach(card => {
+    Array.from(document.querySelectorAll('#list > div')).forEach(card => {
       const id = card.dataset.id || null;
       if (!id) return;
       const job = getJobById(id);
       if (job) card.dataset.date = job.date || '';
 
-      // Add a handle if missing
       if (!card.querySelector('.drag-handle')) {
         const rightCol = card.querySelector('.flex.flex-col.gap-2.items-end') || card;
         const h = document.createElement('button');
@@ -844,20 +835,16 @@
         h.className = 'drag-handle rounded-xl border px-2 py-1 text-sm';
         h.title = 'Drag to reorder (same day)';
         h.textContent = '↕︎';
-        // Put the handle above the actions if possible
         rightCol.insertBefore(h, rightCol.firstChild);
       }
     });
 
-    // Global pointerdown on handles
     list.removeEventListener('pointerdown', pointerDown);
     list.addEventListener('pointerdown', pointerDown, { passive:false });
 
-    // Apply stored order (per day) to the freshly rendered list
     applyStoredOrder();
   }
 
-  // Minimal styling for dragging state
   const style = document.createElement('style');
   style.textContent = `
     #list .dragging{ outline:2px solid #93c5fd; border-radius:12px; }
@@ -869,14 +856,11 @@
   `;
   document.head.appendChild(style);
 
-  // Hook into your renderList so drag is re-wired every time
   const origRender = window.renderList;
   if (typeof origRender === 'function'){
     window.renderList = function(){ origRender.apply(this, arguments); attachDrag(); };
   } else {
-    // If renderList isn't defined yet, try after DOM ready, then watch for later calls
     document.addEventListener('DOMContentLoaded', attachDrag);
-    // Also re-run when jobs change via storage (another tab)
     window.addEventListener('storage', e => { if (e.key==='dt_jobs') attachDrag(); });
   }
 })();
