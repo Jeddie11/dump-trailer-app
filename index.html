@@ -1,12 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-  <style>
-  /* Hide status dots in calendar cells */
-  #calGrid span.inline-block.w-2.h-2 {
-    display: none !important;
-  }
-</style>
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -24,6 +17,14 @@
     #err { position: fixed; inset: 0; z-index: 60; display:none; background: rgba(0,0,0,.85); color:#fff; }
     #err .box{ max-width: 720px; margin: 8vh auto; background:#111; border-radius:14px; padding:16px; box-shadow:0 20px 40px rgba(0,0,0,.5) }
     #err pre{ white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+  </style>
+  <style>
+    /* Calendar: job count badge (stable, not Tailwind-dependent) */
+    .cal-badge{
+      font-size:10px; padding:0 6px; border-radius:9999px;
+      background:#000; color:#fff; line-height:16px; height:16px;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
   </style>
 </head>
 <body class="bg-gray-50">
@@ -168,7 +169,7 @@ try{
   addJobBtn.onclick=()=>{ calcPrice(); const qty = loadSizeI.value ? parseFloat(loadSizeI.value) : null; const job={ id: uid(), date: normalizeDate(dateI.value || todayStr()), time: timeI.value || '', customer: customerI.value || '', address: addressI.value || '', material: materialI.value || '', loadSize: qty || '', price: priceI.value || '', status: statusI.value || 'Scheduled' }; if(!job.address || !job.customer){ alert('Add a Customer and Address to save the job.'); return; } jobs.push(job); saveJobs(); timeI.value = customerI.value = addressI.value = ''; materialI.value=''; loadSizeI.innerHTML=''; priceI.value=''; statusI.value='Scheduled'; dateI.value = todayStr(); repopulateQtyOptions(); renderList(); };
 
   exportBtn.onclick = () => { const data = JSON.stringify({ hubs, selectedHub, jobs }, null, 2); const blob = new Blob([data], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `asg-jobs-${todayStr()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); };
-  importInput.onchange = async () => { const f = importInput.files[0]; if(!f) return; const text = await f.text(); try { const obj = JSON.parse(text); if(Array.isArray(obj.hubs)) hubs = obj.hubs; if(obj.selectedHub) selectedHub = obj.selectedHub; if(Array.isArray(obj.jobs)) jobs = obj.jobs; writeLS('dt_hubs', hubs); writeLS('dt_selected_hub', selectedHub); writeLS('dt_jobs', jobs); renderHubs(); renderList(); } catch(e) { alert('Import failed: invalid JSON'); } importInput.value = ''; };
+  importInput.onchange = async () => { const f = importInput.files[0]; if(!f) return; const text = await f.text(); try { const obj = JSON.parse(text); if(Array.isArray(obj.hubs)) hubs = obj.hubs; if(obj.selectedHub) selectedHub = obj.selectedHub; if(Array.isArray(obj.jobs)) jobs = obj.jobs; writeLS('dt_hubs', hubs); writeLS('dt_selected_hub', selectedHub); writeLS('dt_jobs', jobs); renderHubs(); renderList(); if (typeof window.renderCal === 'function') window.renderCal(); } catch(e) { alert('Import failed: invalid JSON'); } importInput.value = ''; };
 
   renderHubs(); dateI.value = todayStr(); paintActiveTab(); renderList();
 
@@ -248,10 +249,11 @@ try{
     function monthMatrix(y,m){ const first=new Date(y,m,1); const start=addDays(first,-first.getDay()); const cells=[]; for(let i=0;i<42;i++) cells.push(addDays(start,i)); return cells; }
     function jobsByDate(){ const map={}; (jobs||[]).forEach(j=>{ const d=j.date||''; if(!d) return; (map[d]||(map[d]=[])).push(j); }); return map; }
     let viewDate=new Date();
-    function renderCal(){ if(!grid||!title) return; const y=viewDate.getFullYear(), m=viewDate.getMonth(), now=new Date(); title.textContent=viewDate.toLocaleDateString(undefined,{month:'long',year:'numeric'}); const matrix=monthMatrix(y,m), by=jobsByDate(); grid.innerHTML=''; matrix.forEach(d=>{ const other=d.getMonth()!==m, today=ymd(d)===ymd(now), key=ymd(d), jlist=by[key]||[]; const el=document.createElement('button'); el.type='button'; el.className=['rounded-xl px-2 py-1 text-left h-16 border', other?'bg-gray-50 text-gray-400':'bg-white', today?'ring-2 ring-black':''].join(' '); const count=jlist.length, scheduled=jlist.filter(j=>j.status==='Scheduled').length, inprog=jlist.filter(j=>j.status==='In Progress').length, complete=jlist.filter(j=>j.status==='Complete').length; el.innerHTML=`<div class="flex items-start justify-between"><div class="text-sm font-semibold">${d.getDate()}</div>${count?`<span class="text-[10px] px-1.5 rounded-full bg-black text-white">${count}</span>`:''}</div><div class="mt-1 flex gap-1">${scheduled?`<span class="inline-block w-2 h-2 rounded-full bg-blue-500" title="Scheduled: ${scheduled}"></span>`:''}${inprog?`<span class="inline-block w-2 h-2 rounded-full bg-yellow-500" title="In Progress: ${inprog}"></span>`:''}${complete?`<span class="inline-block w-2 h-2 rounded-full bg-green-500" title="Complete: ${complete}"></span>`:''}</div>`; el.addEventListener('click',()=>openDay(key)); el.addEventListener('dblclick',()=>{ const di=document.getElementById('date'); if(di) di.value=key; const cust=document.getElementById('customer'); if(cust) cust.focus(); window.scrollTo({top:0,behavior:'smooth'}); }); grid.appendChild(el); }); }
+    function renderCal(){ if(!grid||!title) return; const y=viewDate.getFullYear(), m=viewDate.getMonth(), now=new Date(); title.textContent=viewDate.toLocaleDateString(undefined,{month:'long',year:'numeric'}); const matrix=monthMatrix(y,m), by=jobsByDate(); grid.innerHTML=''; matrix.forEach(d=>{ const other=d.getMonth()!==m, today=ymd(d)===ymd(now), key=ymd(d), jlist=by[key]||[]; const el=document.createElement('button'); el.type='button'; el.className=['rounded-xl px-2 py-1 text-left h-16 border', other?'bg-gray-50 text-gray-400':'bg-white', today?'ring-2 ring-black':''].join(' '); const count=jlist.length, scheduled=jlist.filter(j=>j.status==='Scheduled').length, inprog=jlist.filter(j=>j.status==='In Progress').length, complete=jlist.filter(j=>j.status==='Complete').length; el.innerHTML=`<div class="flex items-start justify-between"><div class="text-sm font-semibold">${d.getDate()}</div>${count?`<span class="cal-badge">${count}</span>`:''}</div><div class="mt-1 flex gap-1">${scheduled?`<span class="inline-block w-2 h-2 rounded-full bg-blue-500" title="Scheduled: ${scheduled}"></span>`:''}${inprog?`<span class="inline-block w-2 h-2 rounded-full bg-yellow-500" title="In Progress: ${inprog}"></span>`:''}${complete?`<span class="inline-block w-2 h-2 rounded-full bg-green-500" title="Complete: ${complete}"></span>`:''}</div>`; el.addEventListener('click',()=>openDay(key)); el.addEventListener('dblclick',()=>{ const di=document.getElementById('date'); if(di) di.value=key; const cust=document.getElementById('customer'); if(cust) cust.focus(); window.scrollTo({top:0,behavior:'smooth'}); }); grid.appendChild(el); }); }
     function openDay(ds){ if(!shelf) return; dayLabel.textContent=`Jobs on ${ds}`; const items=(jobs||[]).filter(j=>j.date===ds); const s=items.filter(j=>j.status==='Scheduled').length, ip=items.filter(j=>j.status==='In Progress').length, c=items.filter(j=>j.status==='Complete').length, x=items.filter(j=>j.status==='Canceled').length; dayCounts.textContent=`${items.length} total • S:${s} • IP:${ip} • C:${c} • X:${x}`; dayJobs.innerHTML=''; if(!items.length){ dayJobs.innerHTML='<div class="text-gray-500 text-sm">No jobs on this day.</div>'; } else { items.sort((a,b)=> (a.time||'').localeCompare(b.time||'')); items.forEach(j=>{ const card=document.createElement('div'); card.className='rounded-xl border p-2'; card.innerHTML=`<div class="flex items-center justify-between"><div class="font-medium text-sm">${j.customer||'(No name)'} <span class="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100">${j.status||'Scheduled'}</span></div><button class="text-xs underline" data-action="edit" data-edit-id="${j.id}">Edit</button></div><div class="text-xs text-gray-600">${j.time||''} • ${j.material||''}${j.loadSize?` • ${j.loadSize}`:''}</div><div class="text-xs">${j.address||''}</div>`; dayJobs.appendChild(card); }); }
       shelf.classList.remove('hidden'); const di=document.getElementById('date'); if(di) di.value=ds; }
-    document.getElementById('calPrev')?.addEventListener('click',()=>{ viewDate.setMonth(viewDate.getMonth()-1); renderCal(); });
+    document.getElementById('calPrev')?.addEventListener('click',()=>{ viewDate.setMonth(viewDate.getMonth()-1); window.renderCal = renderCal;
+    renderCal(); });
     document.getElementById('calNext')?.addEventListener('click',()=>{ viewDate.setMonth(viewDate.getMonth()+1); renderCal(); });
     document.getElementById('calToday')?.addEventListener('click',()=>{ viewDate=new Date(); renderCal(); openDay(ymd(new Date())); });
     const origSave=window.saveJobs||function(){}; window.saveJobs=function(){ origSave.apply(this,arguments); renderCal(); };
@@ -262,137 +264,5 @@ try{
 
 }catch(err){ console.error(err); }
 </script>
-  <script>
-// Edit modal: remember which job is being edited, and save properly
-(function(){
-  // Ensure modal exists
-  const modal = document.getElementById('editJobModal');
-  if (!modal) return;
-
-  // Patch openEdit to store the editing id
-  const origOpenEdit = window.openEdit;
-  window.openEdit = function(job){
-    modal.dataset.editing = job.id;              // remember which job
-    window.__editingId = job.id;
-
-    // call original to populate fields
-    origOpenEdit && origOpenEdit(job);
-  };
-
-  // Replace the Save handler to use the stored id
-  const saveBtn = document.getElementById('editSave');
-  const cancelBtn = document.getElementById('editCancel');
-
-  function closeEdit() {
-    modal.style.display = 'none';
-    delete modal.dataset.editing;
-    window.__editingId = null;
-  }
-
-  cancelBtn && (cancelBtn.onclick = closeEdit);
-
-  saveBtn && (saveBtn.onclick = function(){
-    const id = window.__editingId || modal.dataset.editing;
-    if (!id) { closeEdit(); return; }
-
-    const list = (window.jobs || []);
-    const idx = list.findIndex(j => j.id === id);
-    if (idx === -1) { closeEdit(); return; }
-
-    const j = list[idx];
-
-    // Read fields
-    const v = s => (document.getElementById(s)?.value ?? '').trim();
-    const num = s => {
-      const raw = v(s);
-      if (raw === '') return ''; // keep empty if user cleared it
-      const n = parseFloat(raw);
-      return isNaN(n) ? '' : n;
-    };
-
-    j.date     = v('e_date')     || j.date;
-    j.time     = v('e_time');
-    j.customer = v('e_customer');
-    j.address  = v('e_address');
-    j.material = v('e_material');
-    j.loadSize = num('e_loadSize');
-    j.price    = num('e_price');
-    j.status   = v('e_status') || j.status;
-
-    // Persist + repaint
-    if (typeof window.saveJobs === 'function') window.saveJobs();
-    if (typeof window.renderList === 'function') window.renderList();
-
-    closeEdit();
-  });
-})();
-</script>
-<script>
-// Qty safety net + master bootstrap
-(function(){
-  const STORAGE_KEY = 'HAULING_MASTER_PRICING_V2';
-  // Seed master if missing (minimal skeleton—matches your Zone FAB material names)
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    try {
-      const defaults = {
-        zones:[{id:"zone1",label:"Zone 1 (Local)"},{id:"zone2",label:"Zone 2 (Extended)"}],
-        materials:[
-          { id:"crush_and_run", label:"Crush & Run", unit:"ton", minEnabled:true, minimum:100,
-            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
-                          zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] }},
-          { id:"no57", label:"#57 Stone", unit:"ton", minEnabled:true, minimum:100,
-            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
-                          zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:305},{qty:4,price:390}] }},
-          { id:"no4", label:"#4 Stone", unit:"ton", minEnabled:true, minimum:100,
-            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140}],
-                          zone2:[{qty:1,price:100},{qty:2,price:200}] }},
-          { id:"clean_sand", label:"Clean Sand", unit:"yard", minEnabled:true, minimum:100,
-            tiersByZone:{ zone1:[{qty:1,price:185},{qty:2,price:260},{qty:3,price:360},{qty:4,price:480}],
-                          zone2:[{qty:1,price:225},{qty:2,price:310},{qty:3,price:450},{qty:4,price:600}] }},
-          { id:"fill_dirt", label:"Fill Dirt", unit:"yard", minEnabled:false, minimum:100,
-            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
-                          zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] }},
-          { id:"top_soil", label:"Top Soil", unit:"yard", minEnabled:true, minimum:100,
-            tiersByZone:{ zone1:[], zone2:[] } }
-        ]
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
-    } catch(e){}
-  }
-
-  const yardMats = new Set(['Clean Sand','Top Soil','Fill Dirt','Sand Clay']);
-
-  function fallbackQtyOptions(){
-    const matSel = document.getElementById('material');
-    const qtySel = document.getElementById('loadSize');
-    const labelEl = document.getElementById('qtyLabel');
-    if (!matSel || !qtySel) return;
-    const mat = matSel.value || matSel.options[matSel.selectedIndex]?.text?.trim();
-    const unit = yardMats.has(mat) ? 'yard' : 'ton';
-    qtySel.innerHTML = '';
-    const first = document.createElement('option'); first.value=''; first.textContent='Qty'; qtySel.appendChild(first);
-    [1,2,3,4].forEach(n => {
-      const o=document.createElement('option'); o.value=String(n); o.textContent=`${n} ${unit}${n>1?'s':''}`; qtySel.appendChild(o);
-    });
-    if (labelEl) labelEl.textContent = `Load Size (${unit}${unit.endsWith('s')?'':'s'})`;
-  }
-
-  const origRepop = window.repopulateQtyOptions;
-  window.repopulateQtyOptions = function(){
-    try {
-      if (origRepop) origRepop();
-      const qtySel = document.getElementById('loadSize');
-      if (!qtySel || qtySel.options.length <= 1) fallbackQtyOptions();
-    } catch {
-      fallbackQtyOptions();
-    }
-  };
-
-  // Run on load and whenever material changes
-  window.addEventListener('load', ()=> setTimeout(()=>window.repopulateQtyOptions && window.repopulateQtyOptions(), 0));
-  document.getElementById('material')?.addEventListener('change', ()=> window.repopulateQtyOptions && window.repopulateQtyOptions());
-})();
-</script>
-
 </body>
 </html>
