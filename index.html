@@ -327,6 +327,72 @@ try{
   });
 })();
 </script>
+<script>
+// Qty safety net + master bootstrap
+(function(){
+  const STORAGE_KEY = 'HAULING_MASTER_PRICING_V2';
+  // Seed master if missing (minimal skeleton—matches your Zone FAB material names)
+  if (!localStorage.getItem(STORAGE_KEY)) {
+    try {
+      const defaults = {
+        zones:[{id:"zone1",label:"Zone 1 (Local)"},{id:"zone2",label:"Zone 2 (Extended)"}],
+        materials:[
+          { id:"crush_and_run", label:"Crush & Run", unit:"ton", minEnabled:true, minimum:100,
+            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}],
+                          zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] }},
+          { id:"no57", label:"#57 Stone", unit:"ton", minEnabled:true, minimum:100,
+            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
+                          zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:305},{qty:4,price:390}] }},
+          { id:"no4", label:"#4 Stone", unit:"ton", minEnabled:true, minimum:100,
+            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140}],
+                          zone2:[{qty:1,price:100},{qty:2,price:200}] }},
+          { id:"clean_sand", label:"Clean Sand", unit:"yard", minEnabled:true, minimum:100,
+            tiersByZone:{ zone1:[{qty:1,price:185},{qty:2,price:260},{qty:3,price:360},{qty:4,price:480}],
+                          zone2:[{qty:1,price:225},{qty:2,price:310},{qty:3,price:450},{qty:4,price:600}] }},
+          { id:"fill_dirt", label:"Fill Dirt", unit:"yard", minEnabled:false, minimum:100,
+            tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
+                          zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] }},
+          { id:"top_soil", label:"Top Soil", unit:"yard", minEnabled:true, minimum:100,
+            tiersByZone:{ zone1:[], zone2:[] } }
+        ]
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaults));
+    } catch(e){}
+  }
+
+  const yardMats = new Set(['Clean Sand','Top Soil','Fill Dirt','Sand Clay']);
+
+  function fallbackQtyOptions(){
+    const matSel = document.getElementById('material');
+    const qtySel = document.getElementById('loadSize');
+    const labelEl = document.getElementById('qtyLabel');
+    if (!matSel || !qtySel) return;
+    const mat = matSel.value || matSel.options[matSel.selectedIndex]?.text?.trim();
+    const unit = yardMats.has(mat) ? 'yard' : 'ton';
+    qtySel.innerHTML = '';
+    const first = document.createElement('option'); first.value=''; first.textContent='Qty'; qtySel.appendChild(first);
+    [1,2,3,4].forEach(n => {
+      const o=document.createElement('option'); o.value=String(n); o.textContent=`${n} ${unit}${n>1?'s':''}`; qtySel.appendChild(o);
+    });
+    if (labelEl) labelEl.textContent = `Load Size (${unit}${unit.endsWith('s')?'':'s'})`;
+  }
+
+  const origRepop = window.repopulateQtyOptions;
+  window.repopulateQtyOptions = function(){
+    try {
+      if (origRepop) origRepop();
+      const qtySel = document.getElementById('loadSize');
+      if (!qtySel || qtySel.options.length <= 1) fallbackQtyOptions();
+    } catch {
+      fallbackQtyOptions();
+    }
+  };
+
+  // Run on load and whenever material changes
+  window.addEventListener('load', ()=> setTimeout(()=>window.repopulateQtyOptions && window.repopulateQtyOptions(), 0));
+  document.getElementById('material')?.addEventListener('change', ()=> window.repopulateQtyOptions && window.repopulateQtyOptions());
+})();
+</script>
 
 </body>
 </html>
