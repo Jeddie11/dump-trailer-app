@@ -35,8 +35,8 @@
   <div class="min-h-screen p-3 sm:p-4 max-w-xl mx-auto">
     <!-- Header / Branding -->
     <header class="mb-3 rounded-2xl bg-black text-[var(--brand-yellow)] p-3 flex items-center gap-3 shadow">
-      <svg width="36" height="36" viewBox="0 0 64 64" fill="currentColor" class="shrink-0">
-        <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a 6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
+      <svg width="36" height="36" viewBox="0 0 64 64" fill="currentColor" class="shrink-0" aria-hidden="true">
+        <path d="M6 40h39l9-14-1-2H28l-2-6H6v22zm44 0h6l2-3H50zM14 48a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm30 0a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"/>
       </svg>
       <div>
         <div class="text-xl font-semibold leading-tight">Augusta Sand & Gravel</div>
@@ -63,10 +63,10 @@
 
     <!-- Tabs -->
     <div class="flex gap-2 my-3">
-      <button data-tab="today" class="tab px-3 py-2 rounded-xl border bg-black text-white">Today</button>
-      <button data-tab="tomorrow" class="tab px-3 py-2 rounded-xl border bg-white">Tomorrow</button>
-      <button data-tab="week" class="tab px-3 py-2 rounded-xl border bg-white">This Week</button>
-      <button data-tab="all" class="tab px-3 py-2 rounded-xl border bg-white">All</button>
+      <button data-tab="today" class="tab px-3 py-2 rounded-xl border">Today</button>
+      <button data-tab="tomorrow" class="tab px-3 py-2 rounded-xl border">Tomorrow</button>
+      <button data-tab="week" class="tab px-3 py-2 rounded-xl border">This Week</button>
+      <button data-tab="all" class="tab px-3 py-2 rounded-xl border">All</button>
     </div>
 
     <!-- Quick add form -->
@@ -86,13 +86,10 @@
           <option>Top Soil</option>
           <option>#4 Stone</option>
         </select>
-        <select id="loadSize" class="rounded-xl border px-3 py-2">
-          <option value="">Load Size (tons)</option>
-          <option value="1">1 ton</option>
-          <option value="2">2 tons</option>
-          <option value="3">3 tons</option>
-          <option value="4">4 tons</option>
-        </select>
+        <div class="flex gap-2 items-center col-span-1">
+          <label id="qtyLabel" class="text-sm text-gray-700 w-28">Load Size</label>
+          <select id="loadSize" class="flex-1 rounded-xl border px-3 py-2"></select>
+        </div>
         <input id="price" class="rounded-xl border px-3 py-2" placeholder="Price (auto)" />
         <select id="status" class="rounded-xl border px-3 py-2">
           <option>Scheduled</option>
@@ -139,14 +136,14 @@
   function readLS(k,f){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} }
   function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 
-  // Fallback per-ton rates (only used if Zone picker didn't fill price)
-  const PRICE_PER_TON = {"Crush & Run":60,"#57 Stone":70,"Clean Sand":65,"Top Soil":60,"#4 Stone":70,"Sand Clay":null,"Fill Dirt":null};
+  // Fallback per-ton rates (only used if Zone picker didn't fill price AND material is ton-based)
+  const PRICE_PER_TON = {"Crush & Run":60,"#57 Stone":70,"#4 Stone":70,"Clean Sand":null,"Top Soil":null,"Sand Clay":null,"Fill Dirt":null};
 
   // ---------- app state ----------
   let hubs = readLS('dt_hubs', ['Sample & Son, Evans, GA','4567 Chamberlain Ferry Rd, Lincolnton, GA 30817']);
   let selectedHub = readLS('dt_selected_hub', hubs[0]);
   let jobs = readLS('dt_jobs', []);
-  let tab = 'today';
+  let tab = localStorage.getItem('dt_tab') || 'today';
 
   // ---------- elements ----------
   const hubSelect = document.getElementById('hubSelect');
@@ -177,24 +174,52 @@
     hubSelect.value = selectedHub;
   }
 
+  // Master helpers (shared)
+  function getMaster(){ try { return JSON.parse(localStorage.getItem("HAULING_MASTER_PRICING_V2")) || {}; } catch { return {}; } }
+  function masterMaterialFor(label){
+    const m = getMaster();
+    return (m.materials||[]).find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase());
+  }
+  function repopulateQtyOptions(){
+    const zoneId = localStorage.getItem('HAULING_SELECTED_ZONE') || 'zone1';
+    const matLabel = materialI.options[materialI.selectedIndex]?.text?.trim();
+    const mm = masterMaterialFor(matLabel);
+    const unit = (mm?.unit || 'ton').toLowerCase();
+    const tiers = (mm?.tiersByZone?.[zoneId]) || [];
+    loadSizeI.innerHTML = '<option value="">Qty</option>';
+    tiers.forEach(t=>{
+      const opt = document.createElement('option');
+      opt.value = String(t.qty);
+      opt.textContent = `${t.qty} ${unit}${Number(t.qty)>1?'s':''}`;
+      loadSizeI.appendChild(opt);
+    });
+    document.getElementById('qtyLabel').textContent = `Load Size (${unit}${unit.endsWith('s')?'':'s'})`;
+  }
+  window.repopulateQtyOptions = repopulateQtyOptions; // allow other scripts to call
+
   // If Zone picker already filled a price, don't override it here
   function calcPrice(){
     const mat = materialI.value;
-    const tons = parseFloat(loadSizeI.value || '0');
+    const mm = masterMaterialFor(mat);
+    const qty = parseFloat(loadSizeI.value || '0');
 
     if (priceI.value) { // already set by master sheet via Zone picker
-      autoNote.textContent = `Price from master sheet${tons?` • ${tons} tons`:''}`;
+      autoNote.textContent = `Price from master sheet${qty?` • ${qty} ${(mm?.unit||'ton')}(s)`:''}`;
       return;
     }
 
+    // If material is in master, rely on zone picker
+    if (mm) { autoNote.textContent = 'Using master pricing'; return; }
+
+    // Fallback only for ton-based materials
     const per = PRICE_PER_TON[mat];
-    if(!mat || !tons){ priceI.value=''; autoNote.textContent=''; return; }
+    if(!mat || !qty){ priceI.value=''; autoNote.textContent=''; return; }
     if(per==null){ priceI.value=''; autoNote.textContent='Set price manually (no rate yet).'; return; }
-    const price = Math.round(per * tons * 100)/100;
+    const price = Math.round(per * qty * 100)/100;
     priceI.value = String(price);
-    autoNote.textContent = `${mat} @ $${per}/ton × ${tons} tons`;
+    autoNote.textContent = `${mat} @ $${per}/ton × ${qty}`;
   }
-  materialI.onchange = calcPrice;
+  materialI.onchange = function(){ repopulateQtyOptions(); calcPrice(); };
   loadSizeI.onchange = calcPrice;
 
   function filteredJobs(){
@@ -213,6 +238,12 @@
   function saveHubs(){ writeLS('dt_hubs', hubs); }
   function saveSelectedHub(){ writeLS('dt_selected_hub', selectedHub); }
 
+  function paintActiveTab(){
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('bg-black','text-white'));
+    const active = document.querySelector(`.tab[data-tab="${tab}"]`);
+    if (active) active.classList.add('bg-black','text-white');
+  }
+
   function renderList(){
     list.innerHTML='';
     const items = filteredJobs();
@@ -220,7 +251,7 @@
       const div=document.createElement('div'); div.className='text-center text-gray-500'; div.textContent='No jobs here yet.'; list.appendChild(div); return;
     }
     for(const job of items){
-      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3';
+      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
       const row=document.createElement('div'); row.className='flex justify-between items-center';
 
       const left=document.createElement('div');
@@ -228,7 +259,7 @@
       const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
       const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
       const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
-      meta.textContent=[job.material, job.loadSize? (job.loadSize+' tons'):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+      meta.textContent=[job.material, job.loadSize? (job.loadSize+' '+(/yard/i.test(job.material||'')? 'yards':'tons')):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
       left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
 
       const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
@@ -239,19 +270,27 @@
       ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o); });
       statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
 
-      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
-      delBtn.onclick=()=>{ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); };
+      const actions=document.createElement('div'); actions.className='flex gap-2';
+      const editBtn=document.createElement('button'); editBtn.className='rounded-xl px-3 py-1 border text-sm'; editBtn.textContent='Edit';
+      editBtn.type='button'; editBtn.addEventListener('click', ()=> window.openEdit && window.openEdit(job));
 
+      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
+      delBtn.onclick=()=>{ if(confirm('Delete this job?')){ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); } };
+
+      actions.appendChild(editBtn);
+      right.appendChild(actions);
       right.appendChild(goBtn); right.appendChild(statusSel); right.appendChild(delBtn);
+
       row.appendChild(left); row.appendChild(right);
       card.appendChild(row); list.appendChild(card);
     }
   }
+  window.renderList = renderList; // expose globally for other modules
 
   document.querySelectorAll('.tab').forEach(btn=>{
     btn.onclick=()=>{
-      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('bg-black','text-white'));
-      btn.classList.add('bg-black','text-white'); tab = btn.dataset.tab; renderList();
+      tab = btn.dataset.tab; localStorage.setItem('dt_tab', tab);
+      paintActiveTab(); renderList();
     };
   });
 
@@ -260,7 +299,7 @@
   addJobBtn.onclick=()=>{
     // Keep whatever price is already in #price (prefer master sheet via Zone picker)
     calcPrice();
-    const tons = loadSizeI.value ? parseFloat(loadSizeI.value) : null;
+    const qty = loadSizeI.value ? parseFloat(loadSizeI.value) : null;
     const job={
       id: uid(),
       date: normalizeDate(dateI.value || todayStr()),
@@ -268,13 +307,14 @@
       customer: customerI.value || '',
       address: addressI.value || '',
       material: materialI.value || '',
-      loadSize: tons || '',
+      loadSize: qty || '',
       price: priceI.value || '',
       status: statusI.value || 'Scheduled'
     };
-    if(!job.address || !job.customer) return;
+    if(!job.address || !job.customer){ alert('Add a Customer and Address to save the job.'); return; }
     jobs.push(job); saveJobs();
-    timeI.value = customerI.value = addressI.value = ''; materialI.value=''; loadSizeI.value=''; priceI.value=''; statusI.value='Scheduled'; dateI.value = todayStr();
+    timeI.value = customerI.value = addressI.value = ''; materialI.value=''; loadSizeI.innerHTML=''; priceI.value=''; statusI.value='Scheduled'; dateI.value = todayStr();
+    repopulateQtyOptions();
     renderList();
   };
 
@@ -284,7 +324,7 @@
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `dump-trailer-${todayStr()}.json`;
+    a.href = url; a.download = `asg-jobs-${todayStr()}.json`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
   importInput.onchange = async () => {
@@ -304,6 +344,7 @@
   // init
   renderHubs();
   dateI.value = todayStr();
+  paintActiveTab();
   renderList();
 </script>
 
@@ -343,10 +384,18 @@
                       zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] }},
       { id:"no57", label:"#57 Stone", unit:"ton", minEnabled:true, minimum:100,
         tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}],
-                      zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] }},
+                      // FIXED to match locked master (Aug 2025)
+                      zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:305},{qty:4,price:390}] }},
       { id:"no4", label:"#4 Stone", unit:"ton", minEnabled:true, minimum:100,
         tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:140}],
-                      zone2:[{qty:1,price:100},{qty:2,price:200}] }}
+                      zone2:[{qty:1,price:100},{qty:2,price:200}] }},
+      { id:"clean_sand", label:"Clean Sand", unit:"yard", minEnabled:true, minimum:100,
+        tiersByZone:{
+          zone1:[{qty:1,price:185},{qty:2,price:260},{qty:3,price:360},{qty:4,price:480}],
+          zone2:[{qty:1,price:225},{qty:2,price:310},{qty:3,price:450},{qty:4,price:600}]
+        }},
+      { id:"top_soil", label:"Top Soil", unit:"yard", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[], zone2:[] } } // TODO: add final tiers when locked
     ]
   };
   const master = (()=>{ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaults; }catch{ return defaults; } })();
@@ -387,6 +436,7 @@
     zoneId = btn.dataset.zone;
     localStorage.setItem(ZONE_KEY, zoneId);
     paintZoneButtons();
+    if (window.repopulateQtyOptions) window.repopulateQtyOptions();
     updatePrice();
   });
   paintZoneButtons();
@@ -413,7 +463,8 @@
   matSel.addEventListener('change', updatePrice);
   qtySel.addEventListener('change', updatePrice);
 
-  // initial compute
+  // initial compute & qty options
+  if (window.repopulateQtyOptions) window.repopulateQtyOptions();
   updatePrice();
 })();
 </script>
@@ -462,11 +513,10 @@
 })();
 </script>
 <script>
-/* Edit Job modal + Search filter + renderList upgrade (keeps Profit bar working) */
+/* Edit Job modal + Search filter + enhanced renderList (fixes Edit button) */
 (function(){
   // --- small helpers ---
   const $ = s => document.querySelector(s);
-  const $$ = s => Array.from(document.querySelectorAll(s));
   const ensure = (id, maker) => document.getElementById(id) || maker();
 
   // Insert a compact Search bar above the jobs list (once)
@@ -483,10 +533,6 @@
     return row;
   });
 
-  // Search state
-  function searchTerm(){
-    return (document.getElementById('searchJobs')?.value || '').trim().toLowerCase();
-  }
   document.getElementById('searchJobs')?.addEventListener('input', ()=>{
     if (typeof window.renderList === 'function') window.renderList();
   });
@@ -528,21 +574,16 @@
 
   function openEdit(job){
     editingId = job.id;
-    // material options from your main selector (keeps list in sync)
+    // material options from main selector (keeps list in sync)
     const srcSel = document.getElementById('material');
     const eMat = document.getElementById('e_material'); eMat.innerHTML = '';
     if (srcSel) {
       Array.from(srcSel.options).forEach(o=>{
-        if (!o.value && !o.textContent.trim()) return;
+        const label = (o.textContent||'').trim();
+        if (!label) return;
         const opt = document.createElement('option');
-        opt.value = o.textContent.trim();
-        opt.textContent = o.textContent.trim();
-        eMat.appendChild(opt);
+        opt.value = label; opt.textContent = label; eMat.appendChild(opt);
       });
-    } else {
-      // fallback
-      ['Crush & Run','#57 Stone','Clean Sand','Sand Clay','Fill Dirt','Top Soil','#4 Stone']
-      .forEach(t=>{ const opt=document.createElement('option'); opt.value=t; opt.textContent=t; eMat.appendChild(opt); });
     }
 
     // fill fields
@@ -557,6 +598,8 @@
 
     document.getElementById('editJobModal').style.display = 'block';
   }
+  window.openEdit = openEdit; // expose to button handlers
+
   function closeEdit(){ document.getElementById('editJobModal').style.display = 'none'; editingId=null; }
 
   document.getElementById('editCancel').onclick = closeEdit;
@@ -579,92 +622,6 @@
     if (typeof window.renderList === 'function') window.renderList();
     closeEdit();
   };
-
-  // Keep reference to any existing profit refresher
-  const refreshProfit = window.refreshProfit || function(){};
-
-  // Replace renderList with an enhanced version (adds Edit + search filter)
-  window.renderList = function(){
-    const list = document.getElementById('list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    // Start from your existing filtered view (tab logic)
-    let items = (typeof window.filteredJobs === 'function') ? window.filteredJobs() : (window.jobs||[]);
-
-    // Apply search filter
-    const term = (document.getElementById('searchJobs')?.value || '').trim().toLowerCase();
-    if (term) {
-      items = items.filter(j => {
-        const hay = [
-          j.customer||'',
-          j.address||'',
-          j.material||'',
-          j.status||'',
-          j.price!=null ? String(j.price) : ''
-        ].join(' ').toLowerCase();
-        return hay.includes(term);
-      });
-    }
-
-    if (!items.length){
-      const div=document.createElement('div');
-      div.className='text-center text-gray-500';
-      div.textContent='No jobs here yet.';
-      list.appendChild(div);
-      refreshProfit();
-      return;
-    }
-
-    for (const job of items){
-      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
-      const row=document.createElement('div'); row.className='flex justify-between items-center';
-
-      const left=document.createElement('div');
-      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
-      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=(job.date||'')+' '+(job.time||'');
-      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address||'';
-      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
-      meta.textContent=[job.material, job.loadSize? (job.loadSize+' tons'):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
-      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
-
-      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
-
-      const actions=document.createElement('div'); actions.className='flex gap-2';
-      const editBtn=document.createElement('button'); editBtn.className='rounded-xl px-3 py-1 border text-sm'; editBtn.textContent='Edit';
-      editBtn.onclick=()=>openEdit(job);
-
-      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)';
-      goBtn.textContent='GO'; goBtn.onclick=()=>{ if (typeof window.openAppleMaps==='function') window.openAppleMaps(window.selectedHub, job.address); };
-
-      actions.appendChild(editBtn); actions.appendChild(goBtn);
-
-      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
-      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===(job.status||'Scheduled')) o.selected=true; statusSel.appendChild(o); });
-      statusSel.onchange=()=>{ job.status=statusSel.value; if (typeof window.saveJobs==='function') window.saveJobs(); window.renderList(); };
-
-      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
-      delBtn.onclick=()=>{ window.jobs = (window.jobs||[]).filter(j => j.id !== job.id); if (typeof window.saveJobs==='function') window.saveJobs(); window.renderList(); };
-
-      right.appendChild(actions);
-      right.appendChild(statusSel);
-      right.appendChild(delBtn);
-
-      row.appendChild(left); row.appendChild(right);
-      card.appendChild(row);
-      list.appendChild(card);
-    }
-
-    // keep any attached summaries/profit bars up to date
-    refreshProfit();
-  };
-
-  // Initial paint, if jobs already present
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ()=> window.renderList && window.renderList());
-  } else {
-    window.renderList && window.renderList();
-  }
 })();
 </script>
 <script>
@@ -672,176 +629,80 @@
 (function(){
   const ORDER_KEY = 'DT_ORDER_V1';
 
-  // ---------- tiny helpers ----------
   const $  = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
   const getJobById = id => (window.jobs||[]).find(j => j.id === id) || null;
 
-  function loadOrder(){
-    try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '{}'); } catch { return {}; }
-  }
-  function saveOrder(obj){
-    localStorage.setItem(ORDER_KEY, JSON.stringify(obj));
-  }
-  function orderFor(date){
-    const o = loadOrder();
-    return (o && o[date]) ? o[date] : [];
-  }
-  function setOrderFor(date, ids){
-    const o = loadOrder();
-    o[date] = ids;
-    saveOrder(o);
-  }
+  function loadOrder(){ try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '{}'); } catch { return {}; } }
+  function saveOrder(obj){ localStorage.setItem(ORDER_KEY, JSON.stringify(obj)); }
+  function orderFor(date){ const o = loadOrder(); return (o && o[date]) ? o[date] : []; }
+  function setOrderFor(date, ids){ const o = loadOrder(); o[date] = ids; saveOrder(o); }
 
-  // Reapply stored order within the current list (per date)
   function applyStoredOrder(){
-    const list = $('#list');
-    if (!list) return;
-
-    // Ensure each card has data-id and data-date
+    const list = $('#list'); if (!list) return;
     $$('#list [data-id]').forEach(card => {
-      const id = card.dataset.id;
-      const job = getJobById(id);
-      if (job) card.dataset.date = job.date || '';
+      const id = card.dataset.id; const job = getJobById(id); if (job) card.dataset.date = job.date || '';
     });
-
-    // Group cards by date and reorder inside each group
     const groups = {};
-    $$('#list [data-id]').forEach(card => {
-      const d = card.dataset.date || '';
-      (groups[d] ||= []).push(card);
-    });
-
+    $$('#list [data-id]').forEach(card => { const d = card.dataset.date || ''; (groups[d] ||= []).push(card); });
     for (const [date, cards] of Object.entries(groups)){
-      const ids = orderFor(date);
-      if (!ids.length) continue;
-
-      // Sort cards by stored order; keep unknowns at the end (stable)
-      cards.sort((a,b)=>{
-        const ia = ids.indexOf(a.dataset.id);
-        const ib = ids.indexOf(b.dataset.id);
-        return (ia===-1 && ib===-1) ? 0 : (ia===-1 ? 1 : (ib===-1 ? -1 : ia-ib));
-      });
-
-      // Reinsert in the DOM in the new order (keeping other-date cards untouched)
-      let anchor = null;
-      for (const card of cards){
-        if (anchor) {
-          anchor.after(card);
-        } else {
-          anchor = card;
-        }
-        anchor = card;
-      }
+      const ids = orderFor(date); if (!ids.length) continue;
+      cards.sort((a,b)=>{ const ia = ids.indexOf(a.dataset.id); const ib = ids.indexOf(b.dataset.id); return (ia===-1 && ib===-1) ? 0 : (ia===-1 ? 1 : (ib===-1 ? -1 : ia-ib)); });
+      let anchor = null; for (const card of cards){ if (anchor) { anchor.after(card); } else { anchor = card; } anchor = card; }
     }
   }
 
-  // ---------- drag logic ----------
   let dragging = null;   // { card, id, date, placeholder }
   let moveHandler, upHandler;
 
-  function makePlaceholder(h){
-    const ph = document.createElement('div');
-    ph.className = 'drag-ph';
-    ph.style.height = h + 'px';
-    ph.style.border = '2px dashed #d1d5db';
-    ph.style.borderRadius = '12px';
-    ph.style.margin = '4px 0';
-    return ph;
-  }
+  function makePlaceholder(h){ const ph = document.createElement('div'); ph.className = 'drag-ph'; ph.style.height = h + 'px'; ph.style.border = '2px dashed #d1d5db'; ph.style.borderRadius = '12px'; ph.style.margin = '4px 0'; return ph; }
 
   function pointerDown(e){
-    const handle = e.target.closest('.drag-handle');
-    if (!handle) return;
-
-    const card = handle.closest('[data-id]');
-    if (!card) return;
-
-    const id = card.dataset.id;
-    const job = getJobById(id);
-    if (!job) return;
-
+    const handle = e.target.closest('.drag-handle'); if (!handle) return;
+    const card = handle.closest('[data-id]'); if (!card) return;
+    const id = card.dataset.id; const job = getJobById(id); if (!job) return;
     const date = job.date || '';
-
-    e.preventDefault();
-    card.classList.add('dragging');
-    const ph = makePlaceholder(card.offsetHeight);
-    card.parentElement.insertBefore(ph, card.nextSibling);
-
+    e.preventDefault(); card.classList.add('dragging');
+    const ph = makePlaceholder(card.offsetHeight); card.parentElement.insertBefore(ph, card.nextSibling);
     dragging = { card, id, date, placeholder: ph };
-
-    moveHandler = pointerMove;
-    upHandler = pointerUp;
+    moveHandler = pointerMove; upHandler = pointerUp;
     window.addEventListener('pointermove', moveHandler);
     window.addEventListener('pointerup', upHandler);
   }
 
   function pointerMove(e){
     if (!dragging) return;
-
-    const { card, date, placeholder } = dragging;
-
-    card.style.opacity = '0.6';
-
+    const { card, date, placeholder } = dragging; card.style.opacity = '0.6';
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    const overCard = el && el.closest('#list [data-id]');
-    if (!overCard || overCard === card) return;
-
+    const overCard = el && el.closest('#list [data-id]'); if (!overCard || overCard === card) return;
     if ((overCard.dataset.date||'') !== date) return;
-
-    const r = overCard.getBoundingClientRect();
-    const before = e.clientY < r.top + r.height/2;
-
-    if (before) {
-      overCard.parentElement.insertBefore(placeholder, overCard);
-    } else {
-      overCard.parentElement.insertBefore(placeholder, overCard.nextSibling);
-    }
+    const r = overCard.getBoundingClientRect(); const before = e.clientY < r.top + r.height/2;
+    if (before) { overCard.parentElement.insertBefore(placeholder, overCard); }
+    else { overCard.parentElement.insertBefore(placeholder, overCard.nextSibling); }
   }
 
   function pointerUp(){
     if (!dragging) return;
     const { card, id, date, placeholder } = dragging;
-
     placeholder.parentElement.insertBefore(card, placeholder);
-    card.classList.remove('dragging');
-    card.style.opacity = '';
-    placeholder.remove();
-
-    const ids = Array.from(document.querySelectorAll('#list [data-id]'))
-      .filter(c => (c.dataset.date||'')===date)
-      .map(c => c.dataset.id);
+    card.classList.remove('dragging'); card.style.opacity = ''; placeholder.remove();
+    const ids = Array.from(document.querySelectorAll('#list [data-id]')).filter(c => (c.dataset.date||'')===date).map(c => c.dataset.id);
     setOrderFor(date, ids);
-
-    dragging = null;
-    window.removeEventListener('pointermove', moveHandler);
-    window.removeEventListener('pointerup', upHandler);
+    dragging = null; window.removeEventListener('pointermove', moveHandler); window.removeEventListener('pointerup', upHandler);
   }
 
   function attachDrag(){
-    const list = $('#list');
-    if (!list) return;
-
+    const list = $('#list'); if (!list) return;
     Array.from(document.querySelectorAll('#list > div')).forEach(card => {
-      const id = card.dataset.id || null;
-      if (!id) return;
-      const job = getJobById(id);
-      if (job) card.dataset.date = job.date || '';
-
+      const id = card.dataset.id || null; if (!id) return; const job = getJobById(id); if (job) card.dataset.date = job.date || '';
       if (!card.querySelector('.drag-handle')) {
         const rightCol = card.querySelector('.flex.flex-col.gap-2.items-end') || card;
-        const h = document.createElement('button');
-        h.type = 'button';
-        h.className = 'drag-handle rounded-xl border px-2 py-1 text-sm';
-        h.title = 'Drag to reorder (same day)';
-        h.textContent = '↕︎';
+        const h = document.createElement('button'); h.type = 'button'; h.className = 'drag-handle rounded-xl border px-2 py-1 text-sm'; h.title = 'Drag to reorder (same day)'; h.textContent = '↕︎';
         rightCol.insertBefore(h, rightCol.firstChild);
       }
     });
-
     list.removeEventListener('pointerdown', pointerDown);
     list.addEventListener('pointerdown', pointerDown, { passive:false });
-
     applyStoredOrder();
   }
 
@@ -853,8 +714,7 @@
       #list .drag-handle{ cursor:grab }
       #list .drag-handle:active{ cursor:grabbing }
     }
-  `;
-  document.head.appendChild(style);
+  `; document.head.appendChild(style);
 
   const origRender = window.renderList;
   if (typeof origRender === 'function'){
