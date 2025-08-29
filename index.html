@@ -262,5 +262,71 @@ try{
 
 }catch(err){ console.error(err); }
 </script>
+  <script>
+// Edit modal: remember which job is being edited, and save properly
+(function(){
+  // Ensure modal exists
+  const modal = document.getElementById('editJobModal');
+  if (!modal) return;
+
+  // Patch openEdit to store the editing id
+  const origOpenEdit = window.openEdit;
+  window.openEdit = function(job){
+    modal.dataset.editing = job.id;              // remember which job
+    window.__editingId = job.id;
+
+    // call original to populate fields
+    origOpenEdit && origOpenEdit(job);
+  };
+
+  // Replace the Save handler to use the stored id
+  const saveBtn = document.getElementById('editSave');
+  const cancelBtn = document.getElementById('editCancel');
+
+  function closeEdit() {
+    modal.style.display = 'none';
+    delete modal.dataset.editing;
+    window.__editingId = null;
+  }
+
+  cancelBtn && (cancelBtn.onclick = closeEdit);
+
+  saveBtn && (saveBtn.onclick = function(){
+    const id = window.__editingId || modal.dataset.editing;
+    if (!id) { closeEdit(); return; }
+
+    const list = (window.jobs || []);
+    const idx = list.findIndex(j => j.id === id);
+    if (idx === -1) { closeEdit(); return; }
+
+    const j = list[idx];
+
+    // Read fields
+    const v = s => (document.getElementById(s)?.value ?? '').trim();
+    const num = s => {
+      const raw = v(s);
+      if (raw === '') return ''; // keep empty if user cleared it
+      const n = parseFloat(raw);
+      return isNaN(n) ? '' : n;
+    };
+
+    j.date     = v('e_date')     || j.date;
+    j.time     = v('e_time');
+    j.customer = v('e_customer');
+    j.address  = v('e_address');
+    j.material = v('e_material');
+    j.loadSize = num('e_loadSize');
+    j.price    = num('e_price');
+    j.status   = v('e_status') || j.status;
+
+    // Persist + repaint
+    if (typeof window.saveJobs === 'function') window.saveJobs();
+    if (typeof window.renderList === 'function') window.renderList();
+
+    closeEdit();
+  });
+})();
+</script>
+
 </body>
 </html>
