@@ -1,1 +1,357 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASG — Admin + Quote (v2.2.0 Locked Sept 2025)</title>
+  <style>
+    :root{
+      --bg:#0b0b0c;--card:#141416;--muted:#a8adb7;--text:#eef1f6;--accent:#facc15;--accent2:#3b82f6;--ring:#2563eb;--border:#232428;
+      --ok:#16a34a;--warn:#f59e0b;--danger:#ef4444
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:1040px;margin:0 auto;padding:16px}
+    h1{font-size:22px;margin:8px 0 12px;display:flex;align-items:center;gap:10px}
+    h1 .badge{font-size:12px;color:#000;background:var(--accent);padding:4px 8px;border-radius:999px;border:1px solid #0007}
+    h2{font-size:18px;margin:14px 0 8px}
+    .tabs{display:flex;gap:8px;margin:8px 0 12px}
+    .tab{padding:10px 12px;border:1px solid var(--border);background:#0f1012;border-radius:10px;cursor:pointer}
+    .tab.active{background:var(--accent);color:#000;border-color:#0006;font-weight:700}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 0 0 1px #000 inset}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input,select,textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid #2a2b2f;background:#0f1012;color:var(--text);outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--ring);box-shadow:0 0 0 3px #2563eb40}
+    button{cursor:pointer;border:1px solid #2a2b2f;background:#101214;color:var(--text);padding:10px 12px;border-radius:12px}
+    button.primary{background:var(--accent);color:#000;border-color:#0007;font-weight:700}
+    button.ghost{background:#0f1012}
+    button.inline{padding:6px 8px;border-radius:8px;font-size:12px}
+    .pill{border:1px solid #2a2b2f;border-radius:999px;padding:4px 8px;font-size:12px;color:var(--muted)}
+    .muted{color:var(--muted)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .hr{height:1px;background:#1e2024;margin:10px 0}
+    .total{font-size:28px;font-weight:800}
+    .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .kpi .item{background:#0f1012;border:1px dashed #2a2b2f;padding:10px;border-radius:12px}
+    .kpi .label{font-size:11px;color:var(--muted)}
+    .kpi .value{font-size:16px;font-weight:600}
+    .quote-box{background:#0f1012;border:1px dashed #2a2b2f;padding:12px;border-radius:12px;white-space:pre-wrap}
+    table{width:100%;border-collapse:collapse;border:1px solid #222}
+    th,td{border:1px solid #222;padding:8px;text-align:center}
+    th{background:#0f1012;color:var(--muted);font-weight:600}
+    td input{width:100%;text-align:center}
+    .mini{font-size:12px}
+    .footer{font-size:12px;color:var(--muted);text-align:center;margin:18px 0}
+    @media (max-width:760px){.row{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>
+      Augusta Sand & Gravel — Admin + Quote
+      <span id="versionBadge" class="badge">v?.?.?</span>
+    </h1>
+
+    <div class="tabs">
+      <button id="tabAdmin" class="tab active">Pricing Admin</button>
+      <button id="tabQuote" class="tab">Quote / Invoice</button>
+      <div class="pill" style="margin-left:auto">Storage Key: <span class="mono">HAULING_MASTER_PRICING_V2</span></div>
+    </div>
+
+    <!-- ADMIN PANEL -->
+    <section id="panelAdmin">
+      <div class="card">
+        <h2>Master Price Sheet (Locked Sept 2025 defaults)</h2>
+        <p class="muted mini">Edit any cell and click <b>Save Master</b>. The data is stored locally in your browser (offline-safe). Quote page reads from the same key.</p>
+        <div class="hr"></div>
+        <div id="adminTables"></div>
+        <div class="hr"></div>
+        <div class="row">
+          <div style="grid-column: span 12" class="mini muted">Tips: #4 Stone only allows 1 ton; quantity tiers auto-limit on the Quote page.</div>
+          <div style="grid-column: span 12; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button id="btnSave" class="primary">Save Master</button>
+            <button id="btnReload" class="ghost">Reload from Storage</button>
+            <button id="btnResetLocked" class="ghost">Reset to Locked Defaults</button>
+            <button id="btnClear" class="ghost" title="Removes the storage key entirely">Clear Storage Key</button>
+            <div class="pill">Version: <span id="kpiVerAdmin">—</span></div>
+            <div class="pill">Last Saved: <span id="lastSaved">—</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUOTE PANEL -->
+    <section id="panelQuote" style="display:none">
+      <div class="card">
+        <div class="row">
+          <div class="grid-2" style="grid-column: span 12;">
+            <div>
+              <label>Customer Name</label>
+              <input id="custName" placeholder="e.g., Jane Smith" />
+            </div>
+            <div>
+              <label>Customer Phone</label>
+              <input id="custPhone" placeholder="e.g., 706-555-1234" />
+            </div>
+          </div>
+          <div style="grid-column: span 12;">
+            <label>Delivery Address</label>
+            <input id="custAddr" placeholder="Street, City, ST ZIP" />
+          </div>
+          <div class="grid-2" style="grid-column: span 12;">
+            <div>
+              <label>Zone</label>
+              <select id="zoneSel">
+                <option value="Z1">Zone 1</option>
+                <option value="Z2">Zone 2</option>
+              </select>
+            </div>
+            <div>
+              <label>Material</label>
+              <select id="matSel"></select>
+            </div>
+          </div>
+          <div class="grid-2" style="grid-column: span 12;">
+            <div>
+              <label>Quantity</label>
+              <select id="qtySel"></select>
+            </div>
+            <div>
+              <label>Notes (optional)</label>
+              <input id="notes" placeholder="Gate code, placement, etc." />
+            </div>
+          </div>
+        </div>
+        <div class="hr"></div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <div class="pill">Augusta Sand & Gravel</div>
+          <div class="pill">Call/Text: 706.589.0657</div>
+          <div class="pill">Quote Date: <span id="quoteDate"></span></div>
+          <div class="pill">Version: <span id="kpiVerQuote">—</span></div>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <button class="ghost inline" id="btnResetQuote">Reset</button>
+            <button class="primary inline" id="btnCalc">Update Total</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="card" style="grid-column: span 6;">
+          <h2>Total</h2>
+          <div class="total" id="totalPrice">$0</div>
+          <div class="muted">Prices include delivery per zone. Taxes: N/A. Tipping appreciated but not required.</div>
+          <div class="kpi" style="margin-top:12px;">
+            <div class="item"><div class="label">Zone</div><div class="value" id="kpiZone">—</div></div>
+            <div class="item"><div class="label">Material</div><div class="value" id="kpiMat">—</div></div>
+            <div class="item"><div class="label">Qty</div><div class="value" id="kpiQty">—</div></div>
+            <div class="item"><div class="label">Version</div><div class="value" id="kpiVer">—</div></div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="btnCopy" class="ghost">Copy customer message</button>
+            <button id="btnPrint" class="ghost">Print / Save PDF</button>
+          </div>
+        </div>
+        <div class="card" style="grid-column: span 6;">
+          <h2>Customer Message Preview</h2>
+          <div id="msg" class="quote-box mono"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Storage & Fallback</h2>
+        <p class="muted mini">This page reads <span class="mono">localStorage["HAULING_MASTER_PRICING_V2"]</span>. If missing, it falls back to the defaults below.</p>
+        <details>
+          <summary>Show fallback master (for reference)</summary>
+          <pre id="fallbackView" class="quote-box mono" style="margin-top:8px;max-height:320px;overflow:auto"></pre>
+        </details>
+      </div>
+    </section>
+
+    <div class="footer">© <span id="yr"></span> Augusta Sand & Gravel — Admin + Quote. Built for speed on the job site.</div>
+  </div>
+
+<script>
+(function(){
+  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
+  // Locked Sept 2025 baseline
+  const defaultMaster = {
+    version: "2.2.0 (Locked Sept 2025)",
+    materials: {
+      "Fill Dirt (tons)": {
+        Z1: {1:100,2:120,3:150,4:200},
+        Z2: {1:100,2:120,3:150,4:200}
+      },
+      "Crush & Run (tons)": {
+        Z1: {1:140,2:160,3:190,4:260},
+        Z2: {1:150,2:180,3:210,4:280}
+      },
+      "#57 Stone (tons)": {
+        Z1: {1:150,2:180,3:210,4:280},
+        Z2: {1:170,2:200,3:230,4:300}
+      },
+      "#4 Stone (tons)": {
+        Z1: {1:150},
+        Z2: {1:170}
+      }
+    }
+  };
+
+  // ---------- Shared helpers ----------
+  const $ = (id)=>document.getElementById(id);
+  function loadMaster(){
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      try{ const parsed = JSON.parse(raw); if(parsed && parsed.materials && parsed.version) return parsed; }catch(e){}
+    }
+    return JSON.parse(JSON.stringify(defaultMaster));
+  }
+  function saveMaster(master){ localStorage.setItem(STORAGE_KEY, JSON.stringify(master)); }
+  function formatUSD(n){ return `$${Number(n||0).toLocaleString(undefined,{maximumFractionDigits:0})}`; }
+  function toast(t, kind){
+    const div = document.createElement('div');
+    div.textContent = t; div.style.position='fixed'; div.style.bottom='16px'; div.style.right='16px';
+    div.style.padding='10px 12px'; div.style.background= kind==='err' ? '#7f1d1d' : '#064e3b'; div.style.color='#fff';
+    div.style.borderRadius='10px'; div.style.border='1px solid #0007'; div.style.zIndex=9999; div.style.boxShadow='0 2px 12px #0008';
+    document.body.appendChild(div); setTimeout(()=>div.remove(), 1400);
+  }
+
+  // ---------- Tabs ----------
+  const tabAdmin=$('tabAdmin'), tabQuote=$('tabQuote'), panelAdmin=$('panelAdmin'), panelQuote=$('panelQuote');
+  tabAdmin.addEventListener('click',()=>{ tabAdmin.classList.add('active'); tabQuote.classList.remove('active'); panelAdmin.style.display='block'; panelQuote.style.display='none'; });
+  tabQuote.addEventListener('click',()=>{ tabQuote.classList.add('active'); tabAdmin.classList.remove('active'); panelQuote.style.display='block'; panelAdmin.style.display='none'; });
+
+  // ---------- ADMIN: table builder ----------
+  const adminTablesDiv = $('adminTables');
+  function renderAdminTables(master){
+    adminTablesDiv.innerHTML = '';
+    Object.entries(master.materials).forEach(([matName, zones])=>{
+      const card = document.createElement('div'); card.className='card';
+      const h = document.createElement('h3'); h.textContent = matName; h.style.marginTop='0'; card.appendChild(h);
+      const tbl = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>Zone</th><th>1 ton</th><th>2 tons</th><th>3 tons</th><th>4 tons</th></tr>';
+      tbl.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      ['Z1','Z2'].forEach(zone=>{
+        const tr = document.createElement('tr');
+        const ztd = document.createElement('td'); ztd.textContent = zone; tr.appendChild(ztd);
+        for(let q=1;q<=4;q++){
+          const td = document.createElement('td');
+          const input = document.createElement('input'); input.type='number'; input.min='0'; input.step='1';
+          const allowed = zones[zone] && Object.prototype.hasOwnProperty.call(zones[zone], q);
+          input.value = allowed ? zones[zone][q] : '';
+          input.placeholder = allowed ? '0' : '—';
+          if(!allowed){ input.disabled = true; input.style.opacity=0.5; }
+          input.dataset.mat = matName; input.dataset.zone = zone; input.dataset.qty = String(q);
+          td.appendChild(input); tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody); card.appendChild(tbl); adminTablesDiv.appendChild(card);
+    });
+  }
+
+  // Collect values back from inputs
+  function collectMasterFromUI(base){
+    const master = JSON.parse(JSON.stringify(base)); // clone structure to retain disabled tiers
+    adminTablesDiv.querySelectorAll('input[data-mat]').forEach(inp=>{
+      const mat = inp.dataset.mat, zone = inp.dataset.zone, qty = parseInt(inp.dataset.qty,10);
+      if(!master.materials[mat][zone]) master.materials[mat][zone] = {};
+      if(inp.disabled){
+        // If a tier is disabled, ensure it is removed from master to auto-limit quantity
+        if(master.materials[mat][zone][qty]) delete master.materials[mat][zone][qty];
+      } else {
+        const v = parseInt(inp.value||'0',10); master.materials[mat][zone][qty] = isNaN(v) ? 0 : v;
+      }
+    });
+    return master;
+  }
+
+  // Buttons
+  $('btnSave').addEventListener('click',()=>{
+    const before = loadMaster();
+    const next = collectMasterFromUI(before);
+    saveMaster(next);
+    $('kpiVerAdmin').textContent = next.version || '—';
+    const ts = new Date().toLocaleString(); $('lastSaved').textContent = ts;
+    toast('Saved master to storage');
+    syncQuoteUI();
+  });
+  $('btnReload').addEventListener('click',()=>{ const m=loadMaster(); renderAdminTables(m); $('kpiVerAdmin').textContent=m.version||'—'; toast('Reloaded from storage'); });
+  $('btnResetLocked').addEventListener('click',()=>{ const m=JSON.parse(JSON.stringify(defaultMaster)); saveMaster(m); renderAdminTables(m); $('kpiVerAdmin').textContent=m.version; $('lastSaved').textContent = new Date().toLocaleString(); toast('Reset to Locked Sept 2025'); syncQuoteUI(); });
+  $('btnClear').addEventListener('click',()=>{ localStorage.removeItem(STORAGE_KEY); renderAdminTables(defaultMaster); $('kpiVerAdmin').textContent=defaultMaster.version; $('lastSaved').textContent='—'; toast('Storage key cleared'); syncQuoteUI(); });
+
+  // ---------- QUOTE: wiring ----------
+  const els = {
+    versionBadge: $('versionBadge'), kpiVer: $('kpiVer'), kpiVerQuote: $('kpiVerQuote'),
+    zoneSel: $('zoneSel'), matSel: $('matSel'), qtySel: $('qtySel'), total: $('totalPrice'),
+    kpiZone: $('kpiZone'), kpiMat: $('kpiMat'), kpiQty: $('kpiQty'), msg: $('msg'),
+    btnCalc: $('btnCalc'), btnCopy: $('btnCopy'), btnPrint: $('btnPrint'), btnResetQuote: $('btnResetQuote'),
+    quoteDate: $('quoteDate'), fallbackView: $('fallbackView'),
+    custName: $('custName'), custPhone: $('custPhone'), custAddr: $('custAddr'), notes: $('notes')
+  };
+
+  function zoneLabel(z){ return z === 'Z2' ? 'Zone 2' : 'Zone 1'; }
+
+  function populateMaterials(master){
+    els.matSel.innerHTML = '';
+    Object.keys(master.materials).forEach(name => {
+      const opt = document.createElement('option'); opt.value = name; opt.textContent = name; els.matSel.appendChild(opt);
+    });
+  }
+
+  function populateQty(master){
+    const m = els.matSel.value; const z = els.zoneSel.value; els.qtySel.innerHTML = '';
+    const tiers = master.materials[m]?.[z] || {}; const nums = Object.keys(tiers).map(n=>parseInt(n,10)).sort((a,b)=>a-b);
+    if(nums.length===0){ const o=document.createElement('option');o.value='';o.textContent='—';els.qtySel.appendChild(o); }
+    else{ nums.forEach(n=>{ const o=document.createElement('option'); o.value=String(n); o.textContent=n; els.qtySel.appendChild(o); }); }
+  }
+
+  function calc(master){
+    const z = els.zoneSel.value; const m = els.matSel.value; const q = parseInt(els.qtySel.value||'0',10);
+    const priceTable = master.materials[m]?.[z] || {}; const total = priceTable[q] ?? 0; const ver = master.version || '—';
+    els.total.textContent = formatUSD(total); els.kpiZone.textContent = zoneLabel(z); els.kpiMat.textContent = m; els.kpiQty.textContent = q?`${q}`:'—'; els.kpiVer.textContent = ver; els.kpiVerQuote.textContent = ver;
+    const name=(els.custName.value||'').trim(); const phone=(els.custPhone.value||'').trim(); const addr=(els.custAddr.value||'').trim(); const notes=(els.notes.value||'').trim();
+    const msgLines=[]; msgLines.push(`Augusta Sand & Gravel — Quote`); msgLines.push(`Material: ${m}`); msgLines.push(`Zone: ${zoneLabel(z)}  |  Qty: ${q}`); if(addr) msgLines.push(`Address: ${addr}`); if(notes) msgLines.push(`Notes: ${notes}`); msgLines.push(`Total: ${formatUSD(total)}`); msgLines.push(`Call/Text to confirm: 706-589-0657`); if(name||phone){ msgLines.push(`Customer: ${name||'—'}${phone?` · ${phone}`:''}`);} msgLines.push(`(Pricing version ${ver})`);
+    els.msg.textContent = msgLines.join("\n");
+  }
+
+  function copyMsg(){
+    const text = els.msg.textContent || ''; if(!text) return;
+    navigator.clipboard.writeText(text).then(()=>toast('Copied to clipboard')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast('Copied to clipboard');}catch(e){toast('Copy failed','err');} finally{document.body.removeChild(ta);} });
+  }
+
+  function printPage(){ window.print(); }
+
+  function resetQuote(master){
+    els.zoneSel.value = 'Z1'; els.matSel.selectedIndex = 0; populateQty(master); els.qtySel.selectedIndex = 0; ['custName','custPhone','custAddr','notes'].forEach(id=>els[id].value=''); calc(master);
+  }
+
+  function syncQuoteUI(){ const master = loadMaster(); populateMaterials(master); populateQty(master); calc(master); $('kpiVerAdmin').textContent = master.version || '—'; }
+
+  // ---------- init ----------
+  function init(){
+    const now = new Date(); $('yr').textContent = String(now.getFullYear()); els.quoteDate.textContent = now.toLocaleString();
+    const master = loadMaster(); $('versionBadge').textContent = master.version || defaultMaster.version; $('kpiVerAdmin').textContent = master.version || '—';
+    renderAdminTables(master); // Admin
+    // Quote
+    els.fallbackView.textContent = JSON.stringify(defaultMaster, null, 2);
+    populateMaterials(master); populateQty(master); calc(master);
+    // Events
+    $('btnCopy').addEventListener('click', copyMsg);
+    $('btnPrint').addEventListener('click', printPage);
+    $('btnCalc').addEventListener('click', ()=>calc(loadMaster()));
+    $('btnResetQuote').addEventListener('click', ()=>resetQuote(loadMaster()));
+    els.zoneSel.addEventListener('change', ()=>{ populateQty(loadMaster()); calc(loadMaster()); });
+    els.matSel.addEventListener('change', ()=>{ populateQty(loadMaster()); calc(loadMaster()); });
+    els.qtySel.addEventListener('change', ()=>{ calc(loadMaster()); });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
