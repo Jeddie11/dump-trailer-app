@@ -1,15 +1,15 @@
-// example
-ASGReceipt.show({
-  customerName: "John Smith",
-  phone: "706-555-1212",
-  address: "4724 Deans Bridge Rd, Blythe, GA",
-  date: new Date().toISOString().slice(0,10),
-  material: "Crusher Run",
-  quantity: 4,
-  unit: "ton",
-  zone: "Zone 2",
-  unitPrice: 280, // your final price (delivery included)
-  notes: "Tailgate spread.",
-  paid: true,
-  method: "Cash"
-});
+<script>
+  // Load job data saved by your main page and render the receipt
+  (function () {
+    try {
+      const raw = localStorage.getItem('ASG_RECEIPT');
+      if (!raw) return;
+      const job = JSON.parse(raw);
+      ASGReceipt.show(job);
+      // Optional: clear after use so old data doesn’t stick around
+      localStorage.removeItem('ASG_RECEIPT');
+    } catch (e) {
+      console.warn('No ASG receipt job found or JSON parse error.', e);
+    }
+  })();
+</script>
