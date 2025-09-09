@@ -91,7 +91,13 @@
         </select>
       </div>
       <div class="mt-2 flex gap-2">
-        <button id="generateReceiptBtn" class="rounded-xl px-4 py-2 border">Generate Receipt</button>
+        <button id="generateReceiptBtn"
+        class="rounded-xl px-4 py-2 border"
+        type="button"
+        onclick="generateReceiptNow()">
+  Generate Receipt
+</button>
+
   <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
         <button id="exportBtn" class="rounded-xl px-4 py-2 border">Export</button>
         <label class="rounded-xl px-4 py-2 border cursor-pointer">Import
@@ -462,6 +468,59 @@ if (genReceiptBtn) {
     } catch(e) { alert('Import failed: invalid JSON'); }
     importInput.value = '';
   };
+// ---------------- Generate Receipt (global, used by inline onclick) ----------------
+function generateReceiptNow() {
+  try {
+    if (typeof calcPrice === 'function') calcPrice();
+
+    const zoneId = localStorage.getItem("HAULING_SELECTED_ZONE") || "zone1";
+    const zoneLabel = (zoneId === "zone2") ? "Zone 2" : "Zone 1";
+
+    const materialI = document.getElementById('material');
+    const matLabel =
+      materialI?.value ||
+      materialI?.options[materialI.selectedIndex]?.text?.trim() ||
+      '';
+    const mm = (typeof masterMaterialFor === 'function') ? masterMaterialFor(matLabel) : null;
+    const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+    const customerI = document.getElementById('customer');
+    const addressI  = document.getElementById('address');
+    const dateI     = document.getElementById('date');
+    const loadSizeI = document.getElementById('loadSize');
+    const priceI    = document.getElementById('price');
+
+    const qty   = loadSizeI?.value ? Number(loadSizeI.value) : 1;
+    const total = Number(priceI?.value || 0);
+
+    if (!customerI?.value || !addressI?.value || !matLabel || !total) {
+      alert('Need Customer, Address, Material, and Price before generating a receipt.');
+      return;
+    }
+
+    const todayStr = () => new Date().toISOString().slice(0,10);
+    const job = {
+      customerName: (customerI.value || '').trim(),
+      phone: '',
+      address: (addressI.value || '').trim(),
+      date: (dateI?.value || todayStr()),
+      material: matLabel,
+      quantity: qty,
+      unit: (unit === 'yard' ? 'yd' : 'ton'),
+      zone: zoneLabel,
+      unitPrice: total,
+      notes: '',
+      paid: true,
+      method: 'Cash'
+    };
+
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+    window.location.href = './receipt.html';
+  } catch (e) {
+    console.error('Generate receipt failed:', e);
+    alert('Generate receipt failed. Check Console for details.');
+  }
+}
 
   renderHubs(); dateI.value = todayStr(); paintActiveTab(); renderList();
 
