@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASG — Initialize Sept 2025 Prices</title>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0c;color:#eef1f6}
+    .wrap{max-width:720px;margin:0 auto;padding:24px}
+    .card{background:#141416;border:1px solid #232428;border-radius:16px;padding:20px;margin:16px 0}
+    h1{font-size:22px;margin:8px 0 12px}
+    button{cursor:pointer;border:1px solid #2a2b2f;background:#facc15;color:#000;padding:12px 14px;border-radius:12px;font-weight:800}
+    pre{background:#0f1012;border:1px dashed #2a2b2f;padding:12px;border-radius:12px;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Initialize Sept 2025 Prices</h1>
+    <div class="card">
+      <p>Click the button below once. This seeds your browser storage so all pages (old and new) read the same **Locked Sept 2025** prices. Then open <b>Admin + Quote</b>.</p>
+      <button id="seed">Initialize Prices</button>
+    </div>
+    <div class="card">
+      <h3>What it writes</h3>
+      <pre id="preview"></pre>
+    </div>
+  </div>
+  <script>
+  (function(){
+    const MASTER={version:"2.2.0 (Locked Sept 2025)",materials:{
+      "Fill Dirt (tons)":{"Z1":{"1":100,"2":120,"3":150,"4":200},"Z2":{"1":100,"2":120,"3":150,"4":200}},
+      "Crush & Run (tons)":{"Z1":{"1":140,"2":160,"3":190,"4":260},"Z2":{"1":150,"2":180,"3":210,"4":280}},
+      "#57 Stone (tons)":{"Z1":{"1":150,"2":180,"3":210,"4":280},"Z2":{"1":170,"2":200,"3":230,"4":300}},
+      "#4 Stone (tons)":{"Z1":{"1":150},"Z2":{"1":170}}
+    }};
+    document.getElementById('preview').textContent = JSON.stringify(MASTER, null, 2);
+    document.getElementById('seed').addEventListener('click', function(){
+      // Write new format
+      localStorage.setItem("HAULING_MASTER_PRICING_V2", JSON.stringify(MASTER));
+      // Also write legacy array format for older pages
+      const legacy = {
+        version: MASTER.version,
+        materials: Object.entries(MASTER.materials).map(([name, z]) => ({name, Z1: z.Z1||{}, Z2: z.Z2||{}}))
+      };
+      localStorage.setItem("HAULING_MASTER_PRICING", JSON.stringify(legacy));
+      alert("ASG: Sept 2025 prices initialized.
+Next: open the Admin + Quote page.");
+      location.href = "./asg_admin_quote.html";
+    });
+  })();
+  </script>
+</body>
+</html>
