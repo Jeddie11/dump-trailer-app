@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASG — Auto Initialize Sept 2025 Prices</title>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0c;color:#eef1f6}
+    .wrap{max-width:720px;margin:0 auto;padding:24px}
+    .card{background:#141416;border:1px solid #232428;border-radius:16px;padding:20px;margin:16px 0}
+    h1{font-size:22px;margin:8px 0 12px}
+    .muted{color:#a8adb7}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Auto Initializing Sept 2025 Prices…</h1>
+    <div class="card">
+      <p class="muted" id="status">Working…</p>
+    </div>
+  </div>
+  <script>
+  (function(){
+    try {
+      const MASTER={version:"2.2.0 (Locked Sept 2025)",materials:{
+        "Fill Dirt (tons)":{"Z1":{"1":100,"2":120,"3":150,"4":200},"Z2":{"1":100,"2":120,"3":150,"4":200}},
+        "Crush & Run (tons)":{"Z1":{"1":140,"2":160,"3":190,"4":260},"Z2":{"1":150,"2":180,"3":210,"4":280}},
+        "#57 Stone (tons)":{"Z1":{"1":150,"2":180,"3":210,"4":280},"Z2":{"1":170,"2":200,"3":230,"4":300}},
+        "#4 Stone (tons)":{"Z1":{"1":150},"Z2":{"1":170}}
+      }};
+      // New key
+      localStorage.setItem("HAULING_MASTER_PRICING_V2", JSON.stringify(MASTER));
+      // Legacy array key for older pages
+      const legacy = {
+        version: MASTER.version,
+        materials: Object.entries(MASTER.materials).map(([name, z]) => ({name, Z1: z.Z1||{}, Z2: z.Z2||{}}))
+      };
+      localStorage.setItem("HAULING_MASTER_PRICING", JSON.stringify(legacy));
+      document.getElementById('status').textContent = "Done. Redirecting to Admin + Quote…";
+      setTimeout(function(){ location.href = "./asg_admin_quote.html?v=220"; }, 800);
+    } catch(e) {
+      document.getElementById('status').textContent = "Error initializing. Try hard refresh, then reopen this page.";
+    }
+  })();
+  </script>
+</body>
+</html>
