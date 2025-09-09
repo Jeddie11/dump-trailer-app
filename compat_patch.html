@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASG — One‑Click Compatibility Patch</title>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b0b0c;color:#eef1f6}
+    .wrap{max-width:720px;margin:0 auto;padding:24px}
+    .card{background:#141416;border:1px solid #232428;border-radius:16px;padding:20px;margin:16px 0}
+    h1{font-size:22px;margin:8px 0 12px}
+    .muted{color:#a8adb7}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Applying Compatibility Patch…</h1>
+    <div class="card">
+      <p class="muted" id="status">Working…</p>
+    </div>
+  </div>
+  <script>
+  (function(){
+    const NEW_KEY = "HAULING_MASTER_PRICING_V2";
+    const OLD_KEY = "HAULING_MASTER_PRICING";
+    function toArrayMaster(m){
+      if(!m) return null;
+      if(Array.isArray(m.materials)) return m;
+      if(m.materials && typeof m.materials === "object"){
+        const arr = Object.entries(m.materials).map(([name, zones]) => ({
+          name, Z1: zones.Z1||{}, Z2: zones.Z2||{}
+        }));
+        return { ...m, materials: arr };
+      }
+      return m;
+    }
+    try{
+      let raw = localStorage.getItem(NEW_KEY) || localStorage.getItem(OLD_KEY);
+      if(!raw){
+        document.getElementById('status').textContent = "No pricing data found. Redirecting to Admin + Quote…";
+        setTimeout(function(){ location.href = "./asg_admin_quote.html?v=220"; }, 900);
+        return;
+      }
+      const m = JSON.parse(raw);
+      const arr = toArrayMaster(m);
+      if(arr){
+        localStorage.setItem(NEW_KEY, JSON.stringify(m));   // keep the new format as-is
+        localStorage.setItem(OLD_KEY, JSON.stringify(arr)); // write array for old pages
+      }
+      document.getElementById('status').textContent = "Patched. Redirecting…";
+      setTimeout(function(){ location.href = "./"; }, 700);
+    }catch(e){
+      document.getElementById('status').textContent = "Patch error. Try hard refresh and reopen this page.";
+    }
+  })();
+  </script>
+</body>
+</html>
