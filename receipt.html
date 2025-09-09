@@ -1,15 +1,191 @@
-<script>
-  // Load job data saved by your main page and render the receipt
-  (function () {
-    try {
-      const raw = localStorage.getItem('ASG_RECEIPT');
-      if (!raw) return;
-      const job = JSON.parse(raw);
-      ASGReceipt.show(job);
-      // Optional: clear after use so old data doesn’t stick around
-      localStorage.removeItem('ASG_RECEIPT');
-    } catch (e) {
-      console.warn('No ASG receipt job found or JSON parse error.', e);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Augusta Sand & Gravel — Receipt</title>
+  <style>
+    :root{
+      --bg:#0b0b0c;--paper:#ffffff;--ink:#111827;--muted:#6b7280;--brand:#FACC15;--border:#e5e7eb;
     }
-  })();
-</script>
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:920px;margin:24px auto;padding:16px}
+    .card{background:var(--paper);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px}
+    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
+    .btn.brand{background:var(--brand);border-color:#d4b014}
+
+    .receipt{padding:28px}
+    .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:14px}
+    .logo{width:54px;height:54px;border-radius:50%;background:#111;border:3px solid var(--brand);display:grid;place-items:center;color:#fff;font-weight:800}
+    .brand h1{margin:0;font-size:20px}
+    .brand p{margin:0;color:var(--muted);font-size:13px}
+    .badge{border:2px dashed #16a34a;color:#16a34a;border-radius:10px;padding:6px 10px;font-weight:700}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .grid .box{border:1px solid var(--border);border-radius:12px;padding:12px}
+    .box h3{margin:0 0 8px 0;font-size:13px;color:#374151;text-transform:uppercase;letter-spacing:.04em}
+    .line{display:flex;justify-content:space-between;gap:8px;margin:8px 0}
+    .line .k{color:#6b7280}
+    .line .v{font-weight:600}
+
+    table{width:100%;border-collapse:collapse;margin-top:16px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    thead th{background:#fafafa;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;padding:10px;text-align:left;border-bottom:1px solid var(--border)}
+    tbody td{padding:12px;border-bottom:1px solid var(--border)}
+    tfoot td{padding:12px;font-weight:700}
+    .right{text-align:right}
+    .footnote{margin-top:14px;color:#6b7280;font-size:12px}
+
+    @media print{
+      body{background:#fff}
+      .wrap{margin:0;padding:0}
+      .card{box-shadow:none;border:none;border-radius:0}
+      .toolbar{display:none}
+      .receipt{padding:18px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn brand" onclick="window.print()">Print / Save PDF</button>
+        <button class="btn" onclick="ASGReceipt.copyText()">Copy as Text</button>
+        <button class="btn" onclick="ASGReceipt.share()">Share</button>
+      </div>
+      <div id="receipt" class="receipt" aria-label="ASG receipt document">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Helpers
+    const fmtUSD = n => `$${(+n).toFixed(2).replace(/\.00$/, '')}`;
+    const todayISO = () => new Date().toISOString().slice(0,10);
+    const genReceiptNo = () => 'ASG-' + new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14);
+
+    // Public API used by buttons above
+    window.ASGReceipt = {
+      show(job){
+        const model = normalize(job);
+        document.getElementById('receipt').innerHTML = renderReceiptHTML(model);
+      },
+      copyText(){
+        const text = document.getElementById('receipt').innerText.trim();
+        navigator.clipboard?.writeText(text).then(()=> alert('Receipt copied to clipboard.'))
+          .catch(()=> alert('Copy failed.'));
+      },
+      async share(){
+        const text = document.getElementById('receipt').innerText.trim();
+        if (navigator.share){
+          try{ await navigator.share({ title: 'ASG Receipt', text }); }catch(e){}
+        } else {
+          alert('Share not supported on this device. Use Copy or Print instead.');
+        }
+      }
+    };
+
+    function normalize(job){
+      const safe = job || {};
+      return {
+        brand: { name:'Augusta Sand & Gravel', tagline:'Tight-access, driveway-safe deliveries', phone:'Call/Text: 706.589.0657' },
+        receiptNo: safe.receiptNo || genReceiptNo(),
+        date: safe.date || todayISO(),
+        customerName: safe.customerName || 'Customer',
+        phone: safe.phone || '',
+        address: safe.address || '',
+        material: safe.material || 'Material',
+        quantity: Number(safe.quantity || 1),
+        unit: (safe.unit === 'yd' ? 'yd' : 'ton'),
+        zone: safe.zone || 'Zone 1',
+        unitPrice: Number(safe.unitPrice || 0),
+        notes: safe.notes || 'Price includes delivery unless stated otherwise.',
+        paid: Boolean(safe.paid),
+        method: safe.method || 'Cash'
+      };
+    }
+
+    function renderReceiptHTML(m){
+      const qtyLabel = `${m.quantity} ${m.unit}${m.quantity !== 1 ? 's' : ''}`;
+      const total = m.unitPrice;
+      return `
+        <div class="head">
+          <div class="brand">
+            <div class="logo">ASG</div>
+            <div>
+              <h1>${m.brand.name}</h1>
+              <p>${m.brand.tagline} • ${m.brand.phone}</p>
+            </div>
+          </div>
+          ${m.paid ? '<div class="badge" role="status">PAID</div>' : ''}
+        </div>
+
+        <div class="grid" role="group" aria-label="Meta and customer details">
+          <div class="box">
+            <h3>Receipt</h3>
+            <div class="line"><span class="k">Receipt #</span><span class="v">${m.receiptNo}</span></div>
+            <div class="line"><span class="k">Date</span><span class="v">${m.date}</span></div>
+            <div class="line"><span class="k">Zone</span><span class="v">${m.zone}</span></div>
+            <div class="line"><span class="k">Payment</span><span class="v">${m.paid ? 'Paid' : 'Due'} (${m.method})</span></div>
+          </div>
+          <div class="box">
+            <h3>Customer</h3>
+            <div class="line"><span class="k">Name</span><span class="v">${m.customerName}</span></div>
+            ${m.phone ? `<div class="line"><span class="k">Phone</span><span class="v">${m.phone}</span></div>` : ''}
+            ${m.address ? `<div class="line"><span class="k">Address</span><span class="v">${m.address}</span></div>` : ''}
+          </div>
+        </div>
+
+        <table aria-label="Line items">
+          <thead>
+            <tr>
+              <th>Material</th>
+              <th>Quantity</th>
+              <th>Price</th>
+              <th class="right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${m.material}</td>
+              <td>${qtyLabel}</td>
+              <td>${fmtUSD(m.unitPrice)}</td>
+              <td class="right">${fmtUSD(total)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">Grand Total</td>
+              <td class="right">${fmtUSD(total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <p class="footnote">Includes delivery unless noted. Thanks for choosing Augusta Sand & Gravel!</p>
+        ${m.notes ? `<p class="footnote">Notes: ${m.notes}</p>` : ''}
+      `;
+    }
+  </script>
+
+  <!-- Loader: reads the job data saved by index.html and renders the receipt -->
+  <script>
+    (function () {
+      try {
+        const raw = localStorage.getItem('ASG_RECEIPT');
+        if (!raw) {
+          document.getElementById('receipt').innerHTML =
+            '<div style="color:#6b7280">No receipt data found. Go back and use “Generate Receipt”.</div>';
+          return;
+        }
+        const job = JSON.parse(raw);
+        ASGReceipt.show(job);
+        localStorage.removeItem('ASG_RECEIPT'); // optional
+      } catch (e) {
+        console.warn('No ASG receipt job found or JSON parse error.', e);
+      }
+    })();
+  </script>
+</body>
+</html>
