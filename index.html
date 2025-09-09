@@ -747,5 +747,66 @@ function generateReceiptNow() {
   (function(){ const s=document.getElementById('splash'); if(s) setTimeout(()=> s.classList.add('hide'), 350); })();
 })();
 </script>
+  <script>
+  // Make the handler truly global so the button can find it
+  window.generateReceiptNow = function () {
+    try {
+      // Pull DOM fields
+      const customerI = document.getElementById('customer');
+      const addressI  = document.getElementById('address');
+      const dateI     = document.getElementById('date');
+      const materialI = document.getElementById('material');
+      const loadSizeI = document.getElementById('loadSize');
+      const priceI    = document.getElementById('price');
+
+      // Ensure price is populated (uses your existing function if present)
+      if (typeof calcPrice === 'function') calcPrice();
+
+      // Zone label
+      const zoneId = localStorage.getItem("HAULING_SELECTED_ZONE") || "zone1";
+      const zoneLabel = (zoneId === "zone2") ? "Zone 2" : "Zone 1";
+
+      // Material + unit
+      const matLabel =
+        materialI?.value ||
+        materialI?.options[materialI.selectedIndex]?.text?.trim() || '';
+      const mm = (typeof masterMaterialFor === 'function') ? masterMaterialFor(matLabel) : null;
+      const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+      // Qty + total
+      const qty   = loadSizeI?.value ? Number(loadSizeI.value) : 1;
+      const total = Number(priceI?.value || 0);
+
+      // Guard
+      if (!customerI?.value || !addressI?.value || !matLabel || !total) {
+        alert('Need Customer, Address, Material, and Price before generating a receipt.');
+        return;
+      }
+
+      const todayStr = () => new Date().toISOString().slice(0,10);
+      const job = {
+        customerName: (customerI.value || '').trim(),
+        phone: '',
+        address: (addressI.value || '').trim(),
+        date: (dateI?.value || todayStr()),
+        material: matLabel,
+        quantity: qty,
+        unit: (unit === 'yard' ? 'yd' : 'ton'),
+        zone: zoneLabel,
+        unitPrice: total,   // final charge (delivery included)
+        notes: '',
+        paid: true,
+        method: 'Cash'
+      };
+
+      localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+      window.location.href = './receipt.html';
+    } catch (e) {
+      console.error('Generate receipt failed:', e);
+      alert('Generate receipt failed. Check Console for details.');
+    }
+  };
+</script>
+
 </body>
 </html>
