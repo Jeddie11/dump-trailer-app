@@ -18,8 +18,17 @@
     .receipt{padding:28px}
     .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
     .brand{display:flex;align-items:center;gap:14px}
-    .logo{width:54px;height:54px;border-radius:50%;background:#111;border:3px solid var(--brand);display:grid;place-items:center;color:#fff;font-weight:800}
-    .brand h1{margin:0;font-size:20px}
+    .logo{
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  display:block;
+  object-fit:cover;
+  border:2px solid var(--brand);
+  background:#fff; /* optional: keep a clean edge */
+}
+
+   .brand h1{margin:0;font-size:20px}
     .brand p{margin:0;color:var(--muted);font-size:13px}
     .badge{border:2px dashed #16a34a;color:#16a34a;border-radius:10px;padding:6px 10px;font-weight:700}
 
@@ -113,8 +122,8 @@
       return `
         <div class="head">
           <div class="brand">
-            <div class="logo">ASG</div>
-            <div>
+            <img class="logo" src="./icons/asg-logo-circle.png" alt="Augusta Sand & Gravel logo" />
+<div>
               <h1>${m.brand.name}</h1>
               <p>${m.brand.tagline} • ${m.brand.phone}</p>
             </div>
