@@ -1,356 +1,423 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ASG App — Safe Build</title>
-<style>
-  :root { --bg:#fafafa; --card:#fff; --line:#e5e7eb; --text:#111827; --muted:#6b7280; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; background: var(--bg); color: var(--text); }
-  h1 { font-size: 20px; margin: 0 0 12px; }
-  h2 { font-size: 16px; margin: 0 0 10px; }
-  .grid { display: grid; gap: 12px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-  label { display:block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background:#fff; font-size:14px; }
-  button { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background:#111827; color:#fff; cursor:pointer; font-weight: 600; }
-  button.secondary { background:#fff; color:#111827; }
-  .row { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .row-3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .muted { color: var(--muted); font-size:12px; }
-  .output { padding:10px; border-radius:8px; background:#f3f4f6; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; }
-  .flex { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
-  .right { display:flex; justify-content:flex-end; gap:8px; }
-  .pill { font-size: 12px; background:#eef2ff; color:#3730a3; padding:4px 8px; border-radius:999px; border:1px solid #c7d2fe; }
-  .footer { margin-top: 10px; font-size: 12px; color: var(--muted); }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JE Hauling — Admin / Pricing</title>
+  <style>
+    :root { --bg:#0b0b0c; --card:#141416; --muted:#a8adb7; --text:#eef1f6; --accent:#3b82f6; --ring:#2563eb; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .wrap{max-width:920px;margin:0 auto;padding:16px}
+    h1{font-size:22px;margin:8px 0 12px}
+    h2{font-size:18px;margin:16px 0 8px}
+    .card{background:var(--card);border:1px solid #232428;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 1px 2px rgb(0 0 0 / 0.25)}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type="text"],input[type="number"],textarea,select{width:100%;box-sizing:border-box;background:#0f1012;border:1px solid #2a2b31;color:var(--text);border-radius:10px;padding:10px;font-size:14px;outline:none}
+    input:focus,textarea:focus,select:focus{border-color:var(--ring);box-shadow:0 0 0 2px rgb(37 99 235 / 0.25)}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+    .col-12{grid-column:span 12}.col-6{grid-column:span 6}.col-4{grid-column:span 4}.col-3{grid-column:span 3}.col-8{grid-column:span 8}
+    .btn{display:inline-flex;align-items:center;gap:8px;background:#1f2937;border:1px solid #2b3646;color:#e5e7eb;border-radius:12px;padding:10px 12px;cursor:pointer;text-decoration:none}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn.ghost{background:transparent;border-color:#2b2d33}
+    .btn:active{transform:translateY(1px)}
+    .stack{display:flex;gap:8px;flex-wrap:wrap}
+    .muted{color:var(--muted);font-size:12px}
+    .grid{display:grid;gap:8px}
+    .tier{display:flex;gap:8px;align-items:center;background:#0f1012;border:1px solid #23252b;padding:8px;border-radius:12px}
+    .tier input{max-width:110px}
+    .flex{display:flex;gap:8px;align-items:center}
+    .right{margin-left:auto}
+    .quote{font-size:13px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:auto}
+    @media (max-width:700px){.col-6,.col-4,.col-3,.col-8{grid-column:span 12} .quote{white-space:normal}}
+    code{background:#0f1012;border:1px solid #2a2b31;border-radius:8px;padding:2px 6px}
+  </style>
 </head>
 <body>
-  <h1>Augusta Sand & Gravel — Quick Quote & Invoice</h1>
-
-  <div class="grid">
-    <!-- Customer & Job -->
-    <div class="card">
-      <h2>Customer & Job Details</h2>
-      <div class="row">
-        <div>
-          <label>Customer Name</label>
-          <input id="custName" placeholder="Jane Doe" />
-        </div>
-        <div>
-          <label>Phone</label>
-          <input id="custPhone" inputmode="tel" placeholder="706-589-0657" />
-        </div>
-      </div>
-      <label>Delivery Address</label>
-      <input id="custAddr" placeholder="123 Main St, Augusta, GA 30907" />
-      <div class="row">
-        <div>
-          <label>Job Date</label>
-          <input id="jobDate" type="date" />
-        </div>
-        <div>
-          <label>Payment Terms</label>
-          <select id="terms">
-            <option>Due upon delivery</option>
-            <option>Net 7</option>
-            <option>Net 15</option>
-          </select>
-        </div>
+  <div class="wrap">
+    <h1>Master Pricing — Admin</h1>
+    <div class="stack" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="muted">Storage key: <code>HAULING_MASTER_PRICING_V2</code></div>
+      <div class="stack">
+        <button class="btn" id="importBtn">Import JSON</button>
+        <button class="btn primary" id="exportBtn">Export JSON</button>
+        <input type="file" id="fileInput" accept="application/json" hidden>
       </div>
     </div>
 
-    <!-- Quote Builder -->
     <div class="card">
-      <h2>Build Quote</h2>
-      <div class="row-3">
-        <div>
-          <label>Material</label>
-          <select id="material"></select>
+      <div class="row">
+        <div class="col-12">
+          <label>Business name (you can include phone if you want it in copy line)</label>
+          <input id="bizName">
         </div>
-        <div>
-          <label>Tons</label>
-          <select id="tons">
+        <div class="col-12">
+          <label>Delivery included areas</label>
+          <input id="areas">
+        </div>
+        <div class="col-12">
+          <label>Banner note</label>
+          <input id="banner">
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="col-4"><label>Fuel surcharge %</label><input id="feeFuel" type="number"></div>
+        <div class="col-4"><label>Card fee %</label><input id="feeCard" type="number"></div>
+        <div class="col-4"><label>After-hours flat $</label><input id="feeAfter" type="number"></div>
+      </div>
+    </div>
+
+    <h2>Materials</h2>
+    <div id="materials"></div>
+    <div class="stack"><button class="btn" id="addMaterial">+ Add material</button></div>
+
+    <h2>Zones</h2>
+    <div id="zones"></div>
+    <div class="stack"><button class="btn" id="addZone">+ Add zone</button></div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Quick Quote</h2>
+      <div class="row">
+        <div class="col-12"><label>Address (optional, saved on this device)</label><input id="address"></div>
+        <div class="col-12">
+          <div class="stack">
+            <a class="btn ghost" id="openApple" target="_blank" rel="noopener">Open in Apple Maps</a>
+          </div>
+        </div>
+        <div class="col-6">
+          <label>Zone</label>
+          <select id="qqZone"></select>
+        </div>
+        <div class="col-6">
+          <label>Material</label>
+          <select id="qqMaterial"></select>
+        </div>
+        <div class="col-6">
+          <label>Quantity</label>
+          <select id="qqQty">
             <option>1</option><option>2</option><option>3</option><option>4</option>
           </select>
         </div>
-        <div>
-          <label>Zone</label>
-          <select id="zone">
-            <option>Z1</option>
-            <option>Z2</option>
-          </select>
+      </div>
+      <div class="card" style="margin:12px 0">
+        <div class="row">
+          <div class="col-12"><div class="muted">Quoted Total</div></div>
+          <div class="col-12"><div id="qqTotal" style="font-weight:700;font-size:28px">—</div></div>
+          <div class="col-12"><div class="muted" id="qqExplain"></div></div>
         </div>
       </div>
-      <div class="flex" style="margin-top:10px;">
-        <button id="btnQuote">Calculate</button>
-        <button class="secondary" id="btnCopy">Copy Quote Text</button>
-        <span class="pill" id="statusPill">Prices: Aug 2025 (Locked)</span>
+      <div class="stack">
+        <button class="btn primary" id="copyBtn">Copy to Messenger</button>
       </div>
-      <div style="margin-top:10px;">
-        <div class="muted">Result</div>
-        <div id="quoteOutput" class="output">—</div>
-      </div>
-      <div class="right" style="margin-top:10px;">
-        <button id="btnInvoice">Open Printable Invoice</button>
-      </div>
-      <div class="footer">
-        Tip: “Copy Quote Text” is perfect for Messenger/iMessage. “Printable Invoice” lets you Save as PDF and share.
-      </div>
+      <div class="quote" id="copyPreview"></div>
+    </div>
+
+    <div class="card">
+      <div class="muted">Live JSON (read-only)</div>
+      <pre id="live" style="font-size:12px;white-space:pre-wrap"></pre>
     </div>
   </div>
 
 <script>
-// ========= ASG MASTER PRICES (Aug 2025, locked) =========
-// Units: stone by tons (1–4). Fill Dirt by tons to match posting style.
-// Z2 for Fill Dirt = same as Z1.
-const ASG_PRICES = {
-  "Fill Dirt": {
-    Z1: { 1: 100, 2: 120, 3: 150, 4: 200 },
-    Z2: { 1: 100, 2: 120, 3: 150, 4: 200 },
-  },
-  "Crush & Run": {
-    Z1: { 1: 100, 2: 140, 3: 180, 4: 240 },
-    Z2: { 1: 100, 2: 200, 3: 275, 4: 350 },
-  },
-  "#57 Stone": {
-    Z1: { 1: 100, 2: 140, 3: 210, 4: 280 },
-    Z2: { 1: 100, 2: 200, 3: 305, 4: 390 },
-  },
-  "#4 Stone": {
-    // Only 1–2 tons offered per sheet
-    Z1: { 1: 100, 2: 140 },
-    Z2: { 1: 100, 2: 200 },
-  },
-};
+(function(){
+  const STORAGE_KEY = "HAULING_MASTER_PRICING_V2";
+  const LAST_ADDR_KEY = "HAULING_LAST_ADDRESS";
 
-// Aliases so “57”, “crusher run” still work if you wire in your own inputs later
-const MATERIAL_ALIASES = {
-  "crusher run": "Crush & Run",
-  "crush & run": "Crush & Run",
-  "57": "#57 Stone",
-  "#57": "#57 Stone",
-  "57 stone": "#57 Stone",
-  "#4": "#4 Stone",
-  "4 stone": "#4 Stone",
-  "fill": "Fill Dirt",
-  "fill dirt": "Fill Dirt",
-};
+  const defaultMaster = {
+    version: "2.1.0",
+    businessName: "JE Hauling • 706.589.0657",
+    deliveryIncludedAreas: "Evans, Grovetown, Martinez, Harlem, Lincolnton",
+    bannerNote: "Driveway-safe delivery · Max 4 yards per load (where noted).",
+    zones: [
+      { id: "zone1", label: "Zone 1 (Local)", rangeMiles: "0–25 mi one-way", surchargeType: "none", surchargeValue: 0, description: "Delivery included in price" },
+      { id: "zone2", label: "Zone 2 (Extended)", rangeMiles: "25–45 mi one-way", surchargeType: "none", surchargeValue: 0, description: "Washington, Thomson & beyond" }
+    ],
+    materials: [
+      { id: "fill_dirt", label: "Fill Dirt", unit: "yard", minEnabled: false, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}], zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
+      { id: "crush_and_run", label: "Crush & Run", unit: "ton", minEnabled: true, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:180},{qty:4,price:240}], zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:275},{qty:4,price:350}] } },
+      { id: "no57", label: "#57 Stone", unit: "ton", minEnabled: true, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140},{qty:3,price:210},{qty:4,price:280}], zone2:[{qty:1,price:100},{qty:2,price:200},{qty:3,price:240},{qty:4,price:320}] } },
+      { id: "no4", label: "#4 Stone", unit: "ton", minEnabled: true, minimum: 100, tiersByZone: { zone1:[{qty:1,price:100},{qty:2,price:140}], zone2:[{qty:1,price:100},{qty:2,price:200}] } }
+    ],
+    fees: { fuelSurchargePercent: 0, cardFeePercent: 0, afterHoursFlat: 0 }
+  };
 
-// ——— Helpers
-function normalizeMaterial(name) {
-  if (!name) return null;
-  const key = name.trim().toLowerCase();
-  return MATERIAL_ALIASES[key] || Object.keys(ASG_PRICES).find(m => m.toLowerCase() === key) || null;
-}
-
-function getASGPrice(materialInput, zoneInput, tons) {
-  const material = normalizeMaterial(materialInput);
-  const zone = (zoneInput || "").toUpperCase(); // "Z1" or "Z2"
-  const qty = Number(tons);
-
-  if (!material || !ASG_PRICES[material]) {
-    return { ok: false, reason: "Unknown material", materialResolved: material };
+  function loadMaster(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : defaultMaster;
+    }catch{ return defaultMaster; }
   }
-  if (zone !== "Z1" && zone !== "Z2") {
-    return { ok: false, reason: "Unknown zone. Use Z1 or Z2." };
-  }
-  if (!Number.isFinite(qty) || qty < 1) {
-    return { ok: false, reason: "Invalid tonnage." };
-  }
+  function saveMaster(m){ localStorage.setItem(STORAGE_KEY, JSON.stringify(m)); render(); }
+  function qs(id){ return document.getElementById(id); }
 
-  const table = ASG_PRICES[material][zone] || {};
-  const price = table[qty];
+  let master = loadMaster();
 
-  if (price == null) {
-    return {
-      ok: false,
-      reason: `${material} pricing is only available for: ${Object.keys(table).join("–")} tons in ${zone}.`,
-    };
-  }
-  return { ok: true, material, zone, tons: qty, price };
-}
+  // Bind basic fields
+  ["bizName","areas","banner","feeFuel","feeCard","feeAfter"].forEach(()=>{});
+  qs("bizName").value = master.businessName || "";
+  qs("areas").value = master.deliveryIncludedAreas || "";
+  qs("banner").value = master.bannerNote || "";
+  qs("feeFuel").value = master.fees.fuelSurchargePercent ?? 0;
+  qs("feeCard").value = master.fees.cardFeePercent ?? 0;
+  qs("feeAfter").value = master.fees.afterHoursFlat ?? 0;
 
-// ——— UI wiring
-const $material = document.getElementById("material");
-const $tons = document.getElementById("tons");
-const $zone = document.getElementById("zone");
-const $quoteOutput = document.getElementById("quoteOutput");
-const $btnQuote = document.getElementById("btnQuote");
-const $btnCopy = document.getElementById("btnCopy");
-const $btnInvoice = document.getElementById("btnInvoice");
-
-const $custName = document.getElementById("custName");
-const $custPhone = document.getElementById("custPhone");
-const $custAddr = document.getElementById("custAddr");
-const $jobDate = document.getElementById("jobDate");
-const $terms = document.getElementById("terms");
-
-// Populate material dropdown
-(function init() {
-  const mats = Object.keys(ASG_PRICES);
-  mats.forEach(m => {
-    const opt = document.createElement("option");
-    opt.value = m; opt.textContent = m;
-    $material.appendChild(opt);
+  ["bizName","areas","banner","feeFuel","feeCard","feeAfter"].forEach(id=>{
+    qs(id).addEventListener("input", ()=>{
+      master.businessName = qs("bizName").value;
+      master.deliveryIncludedAreas = qs("areas").value;
+      master.bannerNote = qs("banner").value;
+      master.fees.fuelSurchargePercent = Number(qs("feeFuel").value||0);
+      master.fees.cardFeePercent = Number(qs("feeCard").value||0);
+      master.fees.afterHoursFlat = Number(qs("feeAfter").value||0);
+      saveMaster(master);
+    });
   });
-  // Defaults
-  $material.value = "#57 Stone";
-  $tons.value = "4";
-  $zone.value = "Z1";
-  // Default date = today
-  const today = new Date(); $jobDate.value = today.toISOString().slice(0,10);
-  // Restore simple local memory
-  try {
-    const saved = JSON.parse(localStorage.getItem("asg-last")||"{}");
-    if (saved.custName) $custName.value = saved.custName;
-    if (saved.custPhone) $custPhone.value = saved.custPhone;
-    if (saved.custAddr) $custAddr.value = saved.custAddr;
-  } catch {}
-  doQuote();
-})();
 
-function doQuote() {
-  const res = getASGPrice($material.value, $zone.value, $tons.value);
-  if (!res.ok) {
-    $quoteOutput.textContent = `— ${res.reason}`;
-    return res;
+  // Materials UI
+  const materialsDiv = qs("materials");
+  function renderMaterials(){
+    materialsDiv.innerHTML = "";
+    master.materials.forEach((mat, idx)=>{
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.innerHTML = `
+        <div class="row">
+          <div class="col-8"><label>Label</label><input value="${mat.label}" data-k="label"></div>
+          <div class="col-4"><label>ID (slug)</label><input value="${mat.id}" data-k="id"></div>
+          <div class="col-4"><label>Unit</label>
+            <select data-k="unit">
+              <option value="yard" ${mat.unit==="yard"?"selected":""}>Yard</option>
+              <option value="ton" ${mat.unit==="ton"?"selected":""}>Ton</option>
+            </select>
+          </div>
+          <div class="col-4"><label>Minimum charge</label><input type="number" value="${mat.minimum??0}" data-k="minimum"></div>
+          <div class="col-4"><label>Enforce minimum?</label>
+            <select data-k="minEnabled"><option value="false" ${!mat.minEnabled?"selected":""}>No</option><option value="true" ${mat.minEnabled?"selected":""}>Yes</option></select>
+          </div>
+          <div class="col-12"><label>Per‑Zone Tiers</label></div>
+          <div class="col-12" id="tiers_${idx}"></div>
+        </div>
+        <div class="stack"><button class="btn ghost" data-action="remove">Delete material</button></div>
+      `;
+      // Bind basic
+      wrap.querySelectorAll("input,select").forEach(el=>{
+        el.addEventListener("input", ()=>{
+          const k = el.getAttribute("data-k");
+          if(k==="minEnabled") mat[k] = (el.value==="true");
+          else if(k==="minimum") mat[k] = Number(el.value||0);
+          else mat[k] = el.value;
+          saveMaster(master);
+        });
+      });
+      wrap.querySelector('[data-action="remove"]').addEventListener("click", ()=>{
+        if(confirm("Remove material?")){ master.materials.splice(idx,1); saveMaster(master); renderMaterials(); renderQuoteSelectors(); }
+      });
+
+      // Tiers per zone
+      const tiersRoot = wrap.querySelector("#tiers_"+idx);
+      tiersRoot.className="grid";
+      master.zones.forEach(z=>{
+        const box = document.createElement("div");
+        box.className="card";
+        const tiers = (mat.tiersByZone[z.id]||[]).map(t=>({...t}));
+        box.innerHTML = `<div class="flex"><div style="font-weight:600">${z.label}</div><div class="right"><button class="btn ghost" data-add>Add tier</button></div></div><div class="grid" data-rows></div>`;
+        const rows = box.querySelector("[data-rows]");
+        function draw(){
+          rows.innerHTML="";
+          tiers.forEach((t, ti)=>{
+            const row = document.createElement("div");
+            row.className="tier";
+            row.innerHTML = `
+              <span class="muted">Qty</span><input type="number" value="${t.qty}" style="width:80px">
+              <span class="muted">Price</span><input type="number" value="${t.price}" style="width:100px">
+              <span class="right"></span><button class="btn ghost" data-del>Delete</button>`;
+            const inputs = row.querySelectorAll("input");
+            inputs[0].addEventListener("input", ()=>{ tiers[ti].qty = Number(inputs[0].value||0); commit(); });
+            inputs[1].addEventListener("input", ()=>{ tiers[ti].price = Number(inputs[1].value||0); commit(); });
+            row.querySelector("[data-del]").addEventListener("click", ()=>{ tiers.splice(ti,1); commit(); draw(); });
+            rows.appendChild(row);
+          });
+        }
+        function commit(){
+          mat.tiersByZone[z.id] = tiers;
+          saveMaster(master);
+          renderQuotePrice(); // in case current selection affected
+        }
+        box.querySelector("[data-add]").addEventListener("click", ()=>{ tiers.push({qty:(tiers[tiers.length-1]?.qty||0)+1, price:0}); commit(); draw(); });
+        draw();
+        tiersRoot.appendChild(box);
+      });
+
+      materialsDiv.appendChild(wrap);
+    });
   }
-  $quoteOutput.textContent = `${res.material} • ${res.tons} ton${res.tons>1?"s":""} • ${res.zone} → $${res.price}`;
-  return res;
-}
+  qs("addMaterial").addEventListener("click", ()=>{
+    const id = "material_"+Date.now();
+    master.materials.push({ id, label:"New Material", unit:"yard", minEnabled:false, minimum:0, tiersByZone:Object.fromEntries(master.zones.map(z=>[z.id,[{qty:1,price:0}]])) });
+    saveMaster(master); renderMaterials(); renderQuoteSelectors();
+  });
 
-$btnQuote.addEventListener("click", doQuote);
-
-$btnCopy.addEventListener("click", async () => {
-  const res = doQuote();
-  const name = $custName.value.trim();
-  const addr = $custAddr.value.trim();
-  const when = $jobDate.value ? new Date($jobDate.value).toLocaleDateString() : "TBD";
-  const lines = [
-    `Augusta Sand & Gravel — Quote`,
-    `${res.ok ? `${res.material}, ${res.tons} ton${res.tons>1?"s":""} (${res.zone}) — $${res.price}` : $quoteOutput.textContent}`,
-    name ? `Customer: ${name}` : ``,
-    addr ? `Address: ${addr}` : ``,
-    `Date: ${when}`,
-    `Terms: ${$terms.value}`,
-    `Call/Text: 706-589-0657`,
-  ].filter(Boolean);
-  const text = lines.join("\n");
-  try { await navigator.clipboard.writeText(text); alert("Quote copied!"); } catch {
-    // Fallback
-    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
-    ta.select(); document.execCommand("copy"); ta.remove(); alert("Quote copied!");
+  // Zones UI
+  const zonesDiv = qs("zones");
+  function renderZones(){
+    zonesDiv.innerHTML="";
+    master.zones.forEach((z, zi)=>{
+      const wrap = document.createElement("div");
+      wrap.className = "card";
+      wrap.innerHTML = `
+        <div class="row">
+          <div class="col-6"><label>Label</label><input value="${z.label}" data-k="label"></div>
+          <div class="col-6"><label>ID</label><input value="${z.id}" data-k="id"></div>
+          <div class="col-12"><label>Mileage range</label><input value="${z.rangeMiles||""}" data-k="rangeMiles"></div>
+          <div class="col-6"><label>Surcharge type</label>
+            <select data-k="surchargeType">
+              <option value="none" ${z.surchargeType==="none"?"selected":""}>None</option>
+              <option value="flat" ${z.surchargeType==="flat"?"selected":""}>Flat ($)</option>
+              <option value="per_mile" ${z.surchargeType==="per_mile"?"selected":""}>Per mile ($)</option>
+              <option value="percent" ${z.surchargeType==="percent"?"selected":""}>Percent (%)</option>
+            </select>
+          </div>
+          <div class="col-6"><label>Value</label><input type="number" value="${z.surchargeValue}" data-k="surchargeValue"></div>
+          <div class="col-12"><label>Description</label><input value="${z.description||""}" data-k="description"></div>
+        </div>
+        <div class="stack"><button class="btn ghost" data-remove>Delete zone</button></div>
+      `;
+      wrap.querySelectorAll("input,select").forEach(el=>{
+        el.addEventListener("input", ()=>{
+          const k = el.getAttribute("data-k");
+          z[k] = (k==="surchargeValue") ? Number(el.value||0) : el.value;
+          saveMaster(master);
+          renderQuoteSelectors();
+        });
+      });
+      wrap.querySelector("[data-remove]").addEventListener("click", ()=>{
+        if(!confirm("Remove this zone?")) return;
+        const removed = master.zones.splice(zi,1)[0];
+        master.materials.forEach(m=>{ delete m.tiersByZone[removed.id]; });
+        saveMaster(master); renderZones(); renderMaterials(); renderQuoteSelectors();
+      });
+      zonesDiv.appendChild(wrap);
+    });
   }
-  // Save basics
-  localStorage.setItem("asg-last", JSON.stringify({
-    custName: $custName.value, custPhone: $custPhone.value, custAddr: $custAddr.value
-  }));
-});
+  qs("addZone").addEventListener("click", ()=>{
+    const id = "zone_"+Date.now();
+    master.zones.push({ id, label:"New Zone", rangeMiles:"", surchargeType:"none", surchargeValue:0, description:"" });
+    master.materials.forEach(m=>{ m.tiersByZone[id] = [{qty:1,price:0}]; });
+    saveMaster(master); renderZones(); renderMaterials(); renderQuoteSelectors();
+  });
 
-$btnInvoice.addEventListener("click", () => {
-  const res = doQuote();
-  const invoiceNo = genInvoiceNumber();
-  const when = $jobDate.value ? new Date($jobDate.value).toLocaleDateString() : "TBD";
-  const name = esc($custName.value || "");
-  const phone = esc($custPhone.value || "");
-  const addr = esc($custAddr.value || "");
-  const terms = esc($terms.value || "Due upon delivery");
+  // Quote UI
+  function priceFor(material, zoneId, qty){
+    const tiers = (material.tiersByZone[zoneId]||[]);
+    const t = tiers.find(tt => Number(tt.qty)===Number(qty));
+    if (!t) return { base:0, total:0, appliedMin:0, note:"Qty not in tier table" };
+    const base = Number(t.price||0);
+    const appliedMin = material.minEnabled ? Math.max(base, Number(material.minimum||0)) : base;
+    return { base, total: appliedMin, appliedMin };
+  }
 
-  const lineTitle = res.ok ? `${res.material} — ${res.tons} ton${res.tons>1?"s":""} (${res.zone})` : "Line Item";
-  const lineAmount = res.ok ? res.price : 0;
+  function makeCopyLine(zone, material, qty, total, address){
+    const unit = material.unit==="yard" ? "yard" : "ton";
+    const ql = `${qty} ${unit}${qty>1?"s":""}`;
+    const addr = address ? ` · ${address}` : "";
+    return `${material.label} — ${ql} · ${zone.label}${addr} · $${total} — ${master.businessName||""}`.trim();
+  }
 
-  const win = window.open("", "_blank");
-  win.document.write(renderInvoiceHTML({
-    invoiceNo, dateStr: when, customer: name, phone, address: addr, terms,
-    lineTitle, amount: lineAmount
-  }));
-  win.document.close();
-  // Optional: auto-open print dialog. Comment out if you don't want it.
-  win.focus(); setTimeout(() => win.print(), 300);
-});
+  const addressEl = qs("address");
+  addressEl.value = localStorage.getItem(LAST_ADDR_KEY) || "";
+  addressEl.addEventListener("input", ()=>{
+    localStorage.setItem(LAST_ADDR_KEY, addressEl.value);
+    const d = encodeURIComponent(addressEl.value);
+    qs("openApple").href = `http://maps.apple.com/?daddr=${d}`;
+    renderQuotePreview();
+  });
+  qs("openApple").href = `http://maps.apple.com/?daddr=${encodeURIComponent(addressEl.value)}`;
 
-// Simple invoice number like 2025-09-08-001 (increments per tab session)
-function genInvoiceNumber() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,"0");
-  const dd = String(d.getDate()).padStart(2,"0");
-  const key = `asg-seq-${yyyy}${mm}${dd}`;
-  let seq = Number(localStorage.getItem(key) || "0") + 1;
-  localStorage.setItem(key, String(seq));
-  return `${yyyy}-${mm}-${dd}-${String(seq).padStart(3,"0")}`;
-}
+  function renderQuoteSelectors(){
+    const zSel = qs("qqZone");
+    const mSel = qs("qqMaterial");
+    const qSel = qs("qqQty");
+    zSel.innerHTML = master.zones.map(z=>`<option value="${z.id}">${z.label}</option>`).join("");
+    mSel.innerHTML = master.materials.map(m=>`<option value="${m.id}">${m.label}</option>`).join("");
+    renderQuotePrice();
+  }
+  function renderQuotePrice(){
+    const zId = qs("qqZone").value || master.zones[0]?.id;
+    const mId = qs("qqMaterial").value || master.materials[0]?.id;
+    const qty = Number(qs("qqQty").value || 1);
+    const zone = master.zones.find(z=>z.id===zId) || master.zones[0];
+    const mat = master.materials.find(m=>m.id===mId) || master.materials[0];
+    const { total, base, appliedMin, note } = priceFor(mat, zone.id, qty);
+    qs("qqTotal").textContent = total ? `$${total.toFixed(0)}` : "—";
+    qs("qqExplain").textContent = total ? `Base tier: $${base.toFixed(0)}${mat.minEnabled ? ` · Min applied: $${(mat.minimum||0)}` : ""}` : (note||"");
+    renderQuotePreview();
+  }
+  function renderQuotePreview(){
+    const zId = qs("qqZone").value || master.zones[0]?.id;
+    const mId = qs("qqMaterial").value || master.materials[0]?.id;
+    const qty = Number(qs("qqQty").value || 1);
+    const zone = master.zones.find(z=>z.id===zId) || master.zones[0];
+    const mat = master.materials.find(m=>m.id===mId) || master.materials[0];
+    const { total } = priceFor(mat, zId, qty);
+    const line = makeCopyLine(zone, mat, qty, total, addressEl.value);
+    qs("copyPreview").textContent = line;
+  }
+  ["qqZone","qqMaterial","qqQty"].forEach(id=> qs(id).addEventListener("change", ()=>renderQuotePrice()));
 
-function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-
-function renderInvoiceHTML({ invoiceNo, dateStr, customer, phone, address, terms, lineTitle, amount }) {
-  const total = amount;
-  return `<!doctype html>
-  <html><head><meta charset="utf-8" />
-  <title>Invoice ${invoiceNo} — Augusta Sand & Gravel</title>
-  <style>
-    :root { --line:#e5e7eb; --text:#111827; --muted:#6b7280; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 40px; color: var(--text); }
-    h1 { font-size: 24px; margin: 0; }
-    .muted { color: var(--muted); }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .box { border:1px solid var(--line); border-radius:10px; padding:12px; }
-    table { width:100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { border-bottom:1px solid var(--line); text-align:left; padding:10px; font-size:14px; }
-    tfoot td { border-top:2px solid var(--line); font-weight:700; }
-    .right { text-align:right; }
-    @media print {
-      .noprint { display:none; }
-      body { margin: 20px; }
+  qs("copyBtn").addEventListener("click", async ()=>{
+    const zId = qs("qqZone").value || master.zones[0]?.id;
+    const mId = qs("qqMaterial").value || master.materials[0]?.id;
+    const qty = Number(qs("qqQty").value || 1);
+    const zone = master.zones.find(z=>z.id===zId) || master.zones[0];
+    const mat = master.materials.find(m=>m.id===mId) || master.materials[0];
+    const { total } = priceFor(mat, zId, qty);
+    const line = makeCopyLine(zone, mat, qty, total, addressEl.value);
+    try{
+      await navigator.clipboard.writeText(line);
+      alert("Copied to clipboard!");
+    }catch{
+      const ta = document.createElement("textarea");
+      ta.value = line; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+      alert("Copied to clipboard!");
     }
-  </style>
-  </head>
-  <body>
-    <div class="grid" style="align-items: start;">
-      <div>
-        <h1>Augusta Sand & Gravel</h1>
-        <div class="muted">Material Hauling — Call/Text: 706-589-0657</div>
-      </div>
-      <div class="right">
-        <div><strong>Invoice #:</strong> ${invoiceNo}</div>
-        <div><strong>Date:</strong> ${esc(dateStr)}</div>
-        <div><strong>Terms:</strong> ${terms}</div>
-      </div>
-    </div>
+  });
 
-    <div class="grid" style="margin-top:16px;">
-      <div class="box">
-        <div style="font-weight:700; margin-bottom:6px;">Bill To</div>
-        <div>${customer || "-"}</div>
-        <div>${address || "-"}</div>
-        <div>${phone || ""}</div>
-      </div>
-      <div class="box">
-        <div style="font-weight:700; margin-bottom:6px;">From</div>
-        <div>Augusta Sand & Gravel</div>
-        <div>Serving the CSRA</div>
-        <div>Call/Text: 706-589-0657</div>
-      </div>
-    </div>
+  // Export / Import
+  qs("exportBtn").addEventListener("click", ()=>{
+    const data = JSON.stringify(master, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hauling_master_pricing_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+  });
+  qs("importBtn").addEventListener("click", ()=> qs("fileInput").click());
+  qs("fileInput").addEventListener("change", (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const data = JSON.parse(String(reader.result));
+        master = data;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(master));
+        render();
+        alert("Pricing imported.");
+      }catch{ alert("Invalid JSON file."); }
+    };
+    reader.readAsText(f);
+  });
 
-    <table>
-      <thead>
-        <tr><th>Description</th><th class="right">Amount</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>${esc(lineTitle)}</td><td class="right">$${Number(amount).toFixed(0)}</td></tr>
-      </tbody>
-      <tfoot>
-        <tr><td>Total</td><td class="right">$${Number(total).toFixed(0)}</td></tr>
-      </tfoot>
-    </table>
-
-    <p class="muted" style="margin-top:16px;">Thank you for your business.</p>
-    <button class="noprint" onclick="window.print()">Print / Save as PDF</button>
-  </body></html>`;
-}
+  function render(){
+    renderMaterials();
+    renderZones();
+    renderQuoteSelectors();
+    qs("live").textContent = JSON.stringify(master, null, 2);
+  }
+  render();
+})();
 </script>
 </body>
 </html>
