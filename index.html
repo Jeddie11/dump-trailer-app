@@ -91,7 +91,8 @@
         </select>
       </div>
       <div class="mt-2 flex gap-2">
-        <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
+        <button id="generateReceiptBtn" class="rounded-xl px-4 py-2 border">Generate Receipt</button>
+  <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
         <button id="exportBtn" class="rounded-xl px-4 py-2 border">Export</button>
         <label class="rounded-xl px-4 py-2 border cursor-pointer">Import
           <input id="importInput" type="file" class="hidden" accept="application/json" />
@@ -401,6 +402,54 @@
   };
 
   importInput.onchange = async () => {
+    // ---------------- Generate Receipt wiring ----------------
+const genReceiptBtn = document.getElementById('generateReceiptBtn');
+if (genReceiptBtn) {
+  genReceiptBtn.onclick = () => {
+    // Make sure a price is calculated from the master if possible
+    calcPrice();
+
+    // Zone info
+    const zoneId = localStorage.getItem(ZONE_KEY) || 'zone1';
+    const zoneLabel = (zoneId === 'zone2') ? 'Zone 2' : 'Zone 1';
+
+    // Material & unit
+    const matLabel = materialI.value || materialI.options[materialI.selectedIndex]?.text?.trim() || '';
+    const mm = masterMaterialFor(matLabel);
+    const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+    // Quantity & total (your app uses the full delivery-included price in #price)
+    const qty = loadSizeI.value ? Number(loadSizeI.value) : 1;
+    const total = Number(priceI.value || 0);
+
+    // Required fields check
+    if (!customerI.value || !addressI.value || !matLabel || !total) {
+      alert('Need Customer, Address, Material, and Price before generating a receipt.');
+      return;
+    }
+
+    // Build the job payload for the receipt page
+    const job = {
+      customerName: (customerI.value || '').trim(),
+      phone: '', // optional – add a phone field later if you want
+      address: (addressI.value || '').trim(),
+      date: (dateI.value || todayStr()),
+      material: matLabel,
+      quantity: qty,
+      unit: (unit === 'yard' ? 'yd' : 'ton'), // receipt expects 'yd' or 'ton'
+      zone: zoneLabel,
+      unitPrice: total, // your final customer charge (delivery included)
+      notes: '',
+      paid: true,       // set false if you want it to show as DUE
+      method: 'Cash'    // Cash | Card | Zelle | Venmo | Other
+    };
+
+    // Hand off to the receipt page
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+    window.location.href = './receipt.html';
+  };
+}
+
     const f = importInput.files[0]; if(!f) return;
     const text = await f.text();
     try {
