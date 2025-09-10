@@ -807,6 +807,64 @@ function generateReceiptNow() {
     }
   };
 </script>
+<script>
+// Generate a Receipt (paid) or Invoice (unpaid) from a saved job
+window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
+  try {
+    const j = (window.jobs || []).find(r => r.id === jobId);
+    if (!j) { alert('Job not found.'); return; }
+
+    // Zone from current FAB selection
+    const zoneId = localStorage.getItem("HAULING_SELECTED_ZONE") || "zone1";
+    const zoneLabel = (zoneId === "zone2") ? "Zone 2" : "Zone 1";
+
+    // Material & unit (default to tons unless it's dirt/sand/soil)
+    const matLabel = j.material || '';
+    const mm = (typeof masterMaterialFor === 'function') ? masterMaterialFor(matLabel) : null;
+    const unit = (mm?.unit || (/fill|top|sand|soil/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+    // Qty & total from the saved job
+    const qty   = j.loadSize ? Number(j.loadSize) : 1;
+    const total = j.price ? Number(j.price) : 0;
+
+    if (!j.customer || !j.address || !matLabel || !total) {
+      alert('This job is missing Customer, Address, Material, or Price. Edit the job and try again.');
+      return;
+    }
+
+    const todayStr = () => new Date().toISOString().slice(0,10);
+    const isInvoice = (type === 'invoice');
+    const doc = {
+      docType: isInvoice ? 'invoice' : 'receipt',
+      customerName: (j.customer || '').trim(),
+      phone: '',
+      address: (j.address || '').trim(),
+      date: (j.date || todayStr()),
+      material: matLabel,
+      quantity: qty,
+      unit: (unit === 'yard' ? 'yd' : 'ton'),
+      zone: zoneLabel,
+      unitPrice: total,
+      notes: isInvoice ? 'Payment due upon delivery unless noted.' : 'Thank you!',
+      paid: !isInvoice,            // receipt = paid, invoice = unpaid
+      method: 'Cash'
+    };
+
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(doc));
+
+    // Robust nav to receipt.html (works on GitHub Pages subpaths) + cache-bust
+    (function(){
+      const here = location.pathname;
+      const basePath = here.endsWith('/') ? here : here.replace(/[^/]+$/, '');
+      const url = location.origin + basePath + 'receipt.html?v=' + Date.now();
+      window.location.assign(url);
+    })();
+  } catch (e) {
+    console.error('Generate doc failed:', e);
+    alert('Could not generate document.');
+  }
+};
+</script>
 
 </body>
 </html>
