@@ -8,16 +8,169 @@
     :root{
       --bg:#0b0b0c;--paper:#ffffff;--ink:#111827;--muted:#6b7280;--brand:#FACC15;--border:#e5e7eb;
     }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    html,body{margin:0;padding:0;background:#ffffff;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
     .wrap{max-width:920px;margin:24px auto;padding:16px}
     .card{background:var(--paper);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px;border-bottom:1px solid #f1f5f9;background:#fafafa}
     .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
     .btn.brand{background:var(--brand);border-color:#d4b014}
-    .receipt{padding:28px}
-    .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
-    .brand{display:flex;align-items:center;gap:14px}
+    .receipt{padding:22px}
+    .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+    .brand{display:flex;align-items:center;gap:12px}
     .logo{width:54px;height:54px;border-radius:50%;background:#111;border:3px solid var(--brand);display:grid;place-items:center;color:#fff;font-weight:800}
     .brand h1{margin:0;font-size:20px}
     .brand p{margin:0;color:var(--muted);font-size:13px}
-    .badge
+    .badge{border:2px dashed #16a34a;color:#16a34a;border-radius:10px;padding:6px 10px;font-weight:700}
+    .badge.due{border-color:#f59e0b;color:#b45309}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+    .box{border:1px solid var(--border);border-radius:12px;padding:10px}
+    .box h3{margin:0 0 6px 0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
+    .row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}
+    .k{color:#6b7280}
+    .v{font-weight:600}
+    table{width:100%;border-collapse:collapse;margin-top:10px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    thead th{background:#fafafa;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;padding:10px;text-align:left;border-bottom:1px solid var(--border)}
+    tbody td{padding:12px;border-bottom:1px solid #f3f4f6}
+    tfoot td{padding:12px;font-weight:700}
+    .right{text-align:right}
+    .note{margin-top:10px;color:#6b7280;font-size:12px}
+    @media print{ .toolbar{display:none} .wrap{margin:0;padding:0} .card{box-shadow:none;border:none;border-radius:0} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn brand" onclick="window.print()">Print / Save PDF</button>
+        <button class="btn" onclick="ASGReceipt.copyText()">Copy as Text</button>
+        <button class="btn" onclick="history.back()">Back</button>
+      </div>
+      <div id="receipt" class="receipt">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Helpers
+    const fmtUSD = n => '$' + (Number(n||0)).toFixed(2).replace(/\.00$/,'');
+    const todayISO = () => new Date().toISOString().slice(0,10);
+
+    // Simple sequential number (per-device/browser)
+    function nextReceiptSeq(){
+      try{const k='ASG_RECEIPT_SEQ';const c=parseInt(localStorage.getItem(k)||'0',10)||0;const n=c+1;localStorage.setItem(k,String(n));return n;}catch{return Math.floor(Math.random()*99999);}
+    }
+    function genReceiptNo(){ return 'ASG-'+String(nextReceiptSeq()).padStart(5,'0'); }
+
+    // Public API
+    window.ASGReceipt = {
+      show(job){
+        const m = normalize(job);
+        document.getElementById('receipt').innerHTML = render(m);
+      },
+      copyText(){
+        const text = document.getElementById('receipt').innerText.trim();
+        navigator.clipboard?.writeText(text).then(()=>alert('Copied.')).catch(()=>alert('Copy failed.'));
+      }
+    };
+
+    function normalize(j){
+      const m = j || {};
+      return {
+        docType: (m.docType==='invoice'?'invoice':'receipt'),
+        brand: { name:'Augusta Sand & Gravel', tagline:'Tight-access, driveway-safe deliveries', phone:'706-589-0657' },
+        receiptNo: m.receiptNo || genReceiptNo(),
+        date: m.date || todayISO(),
+        customerName: m.customerName || 'Customer',
+        phone: m.phone || '',
+        address: m.address || '',
+        material: m.material || 'Material',
+        quantity: Number(m.quantity||1),
+        unit: (m.unit==='yd'?'yd':'ton'),
+        zone: m.zone || 'Zone 1',
+        unitPrice: Number(m.unitPrice||0),
+        notes: m.notes || (m.docType==='invoice' ? 'Payment due upon delivery unless noted.' : 'Price includes delivery unless noted.'),
+        paid: Boolean(m.paid),
+        method: m.method || 'Cash'
+      };
+    }
+
+    function render(m){
+      const qtyLabel = `${m.quantity} ${m.unit}${m.quantity===1?'':'s'}`;
+      const badge = m.paid ? '<div class="badge">PAID</div>' : '<div class="badge due">DUE</div>';
+      return `
+        <div class="head">
+          <div class="brand">
+            <div class="logo">ASG</div>
+            <div>
+              <h1>${m.brand.name}</h1>
+              <p>${m.brand.tagline} • ${m.brand.phone}</p>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:800;margin-bottom:6px">${m.docType==='invoice'?'Invoice':'Receipt'}</div>
+            ${badge}
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="box">
+            <h3>${m.docType==='invoice'?'Invoice':'Receipt'} Info</h3>
+            <div class="row"><span class="k">Number</span><span class="v">${m.receiptNo}</span></div>
+            <div class="row"><span class="k">Date</span><span class="v">${m.date}</span></div>
+            <div class="row"><span class="k">Zone</span><span class="v">${m.zone}</span></div>
+            <div class="row"><span class="k">Payment</span><span class="v">${m.paid?'Paid':'Due'} (${m.method})</span></div>
+          </div>
+          <div class="box">
+            <h3>Customer</h3>
+            <div class="row"><span class="k">Name</span><span class="v">${m.customerName}</span></div>
+            ${m.phone?`<div class="row"><span class="k">Phone</span><span class="v">${m.phone}</span></div>`:''}
+            ${m.address?`<div class="row"><span class="k">Address</span><span class="v">${m.address}</span></div>`:''}
+          </div>
+        </div>
+
+        <table aria-label="Line items">
+          <thead><tr><th>Material</th><th>Quantity</th><th>Price</th><th class="right">Total</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>${m.material}</td>
+              <td>${qtyLabel}</td>
+              <td>${fmtUSD(m.unitPrice)}</td>
+              <td class="right">${fmtUSD(m.unitPrice)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">${m.docType==='invoice'?'Amount Due':'Grand Total'}</td>
+              <td class="right">${fmtUSD(m.unitPrice)}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="note">${m.notes}</div>
+      `;
+    }
+  </script>
+
+  <!-- Loader: reads job data and renders -->
+  <script>
+    (function () {
+      try {
+        const raw = localStorage.getItem('ASG_RECEIPT');
+        const el = document.getElementById('receipt');
+        if (!raw) {
+          el.innerHTML = '<div style="color:#6b7280">No receipt data found. Go back and use “Receipt” or “Invoice”.</div>';
+          return;
+        }
+        const job = JSON.parse(raw);
+        ASGReceipt.show(job);
+        localStorage.removeItem('ASG_RECEIPT'); // optional cleanup
+      } catch (e) {
+        console.warn('Receipt load error:', e);
+        document.getElementById('receipt').innerHTML =
+          '<div style="color:#b91c1c">Error loading receipt. See console.</div>';
+      }
+    })();
+  </script>
+</body>
+</html>
