@@ -91,8 +91,14 @@
         </select>
       </div>
       <div class="mt-2 flex gap-2">
-        <button id="generateReceiptBtn" class="rounded-xl px-4 py-2 border" type="button" onclick="generateReceiptNow()">Generate Receipt</button>
-        <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
+        <button id="generateReceiptBtn"
+        class="rounded-xl px-4 py-2 border"
+        type="button"
+        onclick="generateReceiptNow()">
+  Generate Receipt
+</button>
+
+  <button id="addJobBtn" class="rounded-xl px-4 py-2 text-black" style="background:var(--brand-yellow)">Add Job</button>
         <button id="exportBtn" class="rounded-xl px-4 py-2 border">Export</button>
         <label class="rounded-xl px-4 py-2 border cursor-pointer">Import
           <input id="importInput" type="file" class="hidden" accept="application/json" />
@@ -131,128 +137,676 @@
     <footer class="h-10"></footer>
   </div>
 
-  <!-- All your existing scripts remain the same above -->
-  <!-- ADD the new renderList + global generator at the bottom -->
+<script>
+/* ---------------- Global Safety: splash + error overlay ---------------- */
+(function(){
+  const splash = document.getElementById('splash');
+  function hideSplash(){ splash?.classList.add('hide'); }
+  window.addEventListener('load', ()=> setTimeout(hideSplash, 300));
+  window.addEventListener('error', (e)=>{ hideSplash(); const b=document.getElementById('err'); const m=document.getElementById('errMsg'); if(b&&m){ b.style.display='block'; m.textContent=(e?.error?.stack||e.message||'Unknown'); }});
+  window.addEventListener('unhandledrejection', (e)=>{ hideSplash(); const b=document.getElementById('err'); const m=document.getElementById('errMsg'); if(b&&m){ b.style.display='block'; m.textContent='Promise rejection: '+(e?.reason?.stack||e?.reason||'Unknown'); }});
+  document.getElementById('errClose').addEventListener('click', ()=> document.getElementById('err').style.display='none');
+})();
+</script>
 
 <script>
-// renderList with Receipt + Invoice buttons
-function renderList(){
-  list.innerHTML='';
-  const items = filteredJobs();
-  if(!items.length){
-    const div=document.createElement('div');
-    div.className='text-center text-gray-500';
-    div.textContent='No jobs here yet.';
-    list.appendChild(div);
-    return;
+/* ---------------- Core Utils & State ---------------- */
+(function(){
+  const STORAGE_KEY_MASTER = "HAULING_MASTER_PRICING_V2"; // keep key for compatibility
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+  const VERSION = "HAULING_MASTER_PRICING_V3";            // visible version
+
+  // Locked Master (Sep 2025) — V3
+  const MASTER_DEFAULTS = {
+    version: VERSION,
+    zones: [
+      { id:"zone1", label:"Zone 1 (Local)" },
+      { id:"zone2", label:"Zone 2 (Extended)" }
+    ],
+    materials: [
+      // Fill Dirt (yards)
+      { id:"fill_dirt", label:"Fill Dirt", unit:"yard", minEnabled:false, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}],
+                      zone2:[{qty:1,price:100},{qty:2,price:120},{qty:3,price:150},{qty:4,price:200}] } },
+      // Crush & Run (tons)
+      { id:"crush_and_run", label:"Crush & Run", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:140},{qty:2,price:160},{qty:3,price:190},{qty:4,price:260}],
+                      zone2:[{qty:1,price:150},{qty:2,price:180},{qty:3,price:210},{qty:4,price:280}] } },
+      // #57 Stone (tons)
+      { id:"no57", label:"#57 Stone", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:150},{qty:2,price:180},{qty:3,price:210},{qty:4,price:280}],
+                      zone2:[{qty:1,price:170},{qty:2,price:200},{qty:3,price:230},{qty:4,price:300}] } },
+      // #4 Stone (tons)
+      { id:"no4", label:"#4 Stone", unit:"ton", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:150},{qty:2,price:180}],
+                      zone2:[{qty:1,price:170},{qty:2,price:200}] } },
+      // Keep existing yard items (you can tune later)
+      { id:"clean_sand", label:"Clean Sand", unit:"yard", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[{qty:1,price:185},{qty:2,price:260},{qty:3,price:360},{qty:4,price:480}],
+                      zone2:[{qty:1,price:225},{qty:2,price:310},{qty:3,price:450},{qty:4,price:600}] } },
+      { id:"top_soil", label:"Top Soil", unit:"yard", minEnabled:true, minimum:100,
+        tiersByZone:{ zone1:[], zone2:[] } }
+    ]
+  };
+
+  /* ---- Migration: seed/upgrade master in localStorage ---- */
+  (function(){
+    let m;
+    try { m = JSON.parse(localStorage.getItem(STORAGE_KEY_MASTER)) || {}; } catch { m = {}; }
+    // if empty or wrong version -> write defaults
+    if (!m.version || m.version !== MASTER_DEFAULTS.version) {
+      localStorage.setItem(STORAGE_KEY_MASTER, JSON.stringify(MASTER_DEFAULTS));
+      m = MASTER_DEFAULTS;
+    }
+    // normalize materials to array in case something wrote an object
+    if (m && m.materials && !Array.isArray(m.materials)) {
+      m.materials = Object.values(m.materials);
+      localStorage.setItem(STORAGE_KEY_MASTER, JSON.stringify(m));
+    }
+    // Tag UI
+    const tag = document.getElementById('versionTag');
+    if (tag) tag.textContent = `Master: ${m.version}`;
+  })();
+
+  // Helpers
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function tomorrowStr(){ return new Date(Date.now()+86400000).toISOString().slice(0,10); }
+  function withinWeek(d){
+    const dt=new Date(d+'T00:00:00');
+    const start=new Date(); start.setHours(0,0,0,0);
+    const end=new Date(start); end.setDate(end.getDate()+6);
+    return dt>=start && dt<=end;
   }
-  for(const job of items){
-    const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
-    const row=document.createElement('div'); row.className='flex justify-between items-center';
+  function normalizeDate(input){
+    if(!input) return todayStr();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+    const m=input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(!m) return todayStr();
+    let mm=m[1],dd=m[2],yy=m[3]; if(yy.length===2) yy=(parseInt(yy,10)<50?'20':'19')+yy;
+    return String(yy).padStart(4,'0')+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+  }
+  function uid(){ return String(Date.now())+Math.random().toString(36).slice(2); }
+  function readLS(k,f){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} }
+  function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 
-    const left=document.createElement('div');
-    const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
-    const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
-    const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
+  // App State
+  window.hubs = readLS('dt_hubs', ['Sample & Son, Evans, GA','4567 Chamberlain Ferry Rd, Lincolnton, GA 30817']);
+  window.selectedHub = readLS('dt_selected_hub', hubs[0]);
+  window.jobs = readLS('dt_jobs', []);
+  window.tab = localStorage.getItem('dt_tab') || 'today';
 
-    const mm = masterMaterialFor(job.material);
-    const unit = (mm?.unit || (/fill|top|sand/i.test(job.material||'')?'yard':'ton'));
-    const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
-    meta.textContent=[job.material, job.loadSize? (job.loadSize+' '+(unit+(Number(job.loadSize)>1?'s':''))):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+  // Elements
+  const hubSelect = document.getElementById('hubSelect');
+  const dateI = document.getElementById('date');
+  const timeI = document.getElementById('time');
+  const customerI = document.getElementById('customer');
+  const addressI = document.getElementById('address');
+  const materialI = document.getElementById('material');
+  const loadSizeI = document.getElementById('loadSize');
+  const priceI = document.getElementById('price');
+  const statusI = document.getElementById('status');
+  const autoNote = document.getElementById('autoNote');
+  const list = document.getElementById('list');
+  const addJobBtn = document.getElementById('addJobBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const importInput = document.getElementById('importInput');
 
-    left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+  /* ---------------- Master Accessors (bulletproof) ---------------- */
+  function getMaster(){
+    try {
+      const m = JSON.parse(localStorage.getItem(STORAGE_KEY_MASTER)) || {};
+      if (m && m.materials && !Array.isArray(m.materials)) m.materials = Object.values(m.materials);
+      return m;
+    } catch { return {}; }
+  }
+  function masterMaterialFor(label){
+    const m = getMaster() || {};
+    const arr = Array.isArray(m.materials) ? m.materials
+             : (m.materials && typeof m.materials==='object' ? Object.values(m.materials) : []);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase());
+  }
 
-    const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
-    const actions=document.createElement('div'); actions.className='flex gap-2';
+  /* ---------------- UI Wiring ---------------- */
+  function renderHubs(){
+    hubSelect.innerHTML='';
+    hubs.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; hubSelect.appendChild(o); });
+    hubSelect.value = selectedHub;
+  }
 
-    const editBtn=document.createElement('button');
-    editBtn.className='rounded-xl px-3 py-1 border text-sm';
-    editBtn.textContent='Edit';
-    editBtn.type='button';
-    editBtn.setAttribute('data-action','edit');
-    editBtn.setAttribute('data-id', job.id);
-
-    const rcptBtn=document.createElement('button');
-    rcptBtn.className='rounded-xl px-3 py-1 border text-sm';
-    rcptBtn.textContent='Receipt';
-    rcptBtn.type='button';
-    rcptBtn.onclick=()=>window.generateDocFromJob(job.id,'receipt');
-
-    const invBtn=document.createElement('button');
-    invBtn.className='rounded-xl px-3 py-1 border text-sm';
-    invBtn.textContent='Invoice';
-    invBtn.type='button';
-    invBtn.onclick=()=>window.generateDocFromJob(job.id,'invoice');
-
-    const goBtn=document.createElement('button');
-    goBtn.className='rounded-xl px-3 py-2 text-black';
-    goBtn.style.background='var(--brand-yellow)';
-    goBtn.textContent='GO';
-    goBtn.onclick=()=>openAppleMaps(selectedHub, job.address);
-
-    const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
-    ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{
-      const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o);
+  function repopulateQtyOptions(){
+    const zoneId = localStorage.getItem(ZONE_KEY) || 'zone1';
+    const matLabel = materialI.options[materialI.selectedIndex]?.text?.trim();
+    const mm = masterMaterialFor(matLabel);
+    const unit = (mm?.unit || 'ton').toLowerCase();
+    const tiers = (mm?.tiersByZone?.[zoneId]) || [];
+    loadSizeI.innerHTML = '<option value="">Qty</option>';
+    tiers.forEach(t=>{
+      const opt = document.createElement('option');
+      opt.value = String(t.qty);
+      opt.textContent = `${t.qty} ${unit}${Number(t.qty)>1?'s':''}`;
+      loadSizeI.appendChild(opt);
     });
-    statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
+    document.getElementById('qtyLabel').textContent = `Load Size (${unit}${unit.endsWith('s')?'':'s'})`;
+  }
+  window.repopulateQtyOptions = repopulateQtyOptions;
 
-    const delBtn=document.createElement('button');
-    delBtn.className='text-red-600 text-sm';
-    delBtn.textContent='Delete';
-    delBtn.onclick=()=>{ if(confirm('Delete this job?')){ jobs=jobs.filter(j=>j.id!==job.id); saveJobs(); renderList(); } };
+  function calcPrice(){
+    const mat = materialI.value;
+    const mm  = masterMaterialFor(mat);
+    const qty = parseFloat(loadSizeI.value || '0');
 
-    actions.appendChild(editBtn);
-    actions.appendChild(rcptBtn);
-    actions.appendChild(invBtn);
+    // If dispatcher typed a manual price, keep it and just note details
+    if (priceI.value) {
+      autoNote.textContent = `Price from master sheet${qty?` • ${qty} ${(mm?.unit||'ton')}(s)`:''}`;
+      return;
+    }
 
-    right.appendChild(actions);
-    right.appendChild(goBtn);
-    right.appendChild(statusSel);
-    right.appendChild(delBtn);
+    if (mm) {
+      // Price will be set by Zone FAB/updatePrice; just show hint
+      autoNote.textContent = 'Using master pricing';
+      return;
+    }
 
-    row.appendChild(left); row.appendChild(right); card.appendChild(row); list.appendChild(card);
+    // Fallback per-ton if not found in master (shouldn’t happen often)
+    const PRICE_PER_TON = {"Crush & Run":60,"#57 Stone":70,"#4 Stone":70};
+    const per = PRICE_PER_TON[mat];
+    if(!mat || !qty){ priceI.value=''; autoNote.textContent=''; return; }
+    if(per==null){ priceI.value=''; autoNote.textContent='Set price manually (no rate yet).'; return; }
+    const price = Math.round(per * qty * 100)/100;
+    priceI.value = String(price);
+    autoNote.textContent = `${mat} @ $${per}/ton × ${qty}`;
+  }
+
+  materialI.onchange = function(){ repopulateQtyOptions(); calcPrice(); };
+  loadSizeI.onchange = calcPrice;
+
+  function filteredJobs(){
+    if(tab==='today')    return jobs.filter(j => j.date === todayStr() && j.status!=='Complete' && j.status!=='Canceled');
+    if(tab==='tomorrow') return jobs.filter(j => j.date === tomorrowStr() && j.status!=='Complete' && j.status!=='Canceled');
+    if(tab==='week')     return jobs.filter(j => withinWeek(j.date) && j.status!=='Complete' && j.status!=='Canceled');
+    return jobs;
+  }
+  function openAppleMaps(hub,addr){ const url = 'https://maps.apple.com/?saddr='+encodeURIComponent(hub)+'&daddr='+encodeURIComponent(addr); window.open(url, '_blank'); }
+  window.saveJobs = function(){ writeLS('dt_jobs', jobs); };
+
+  function paintActiveTab(){
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('bg-black','text-white'));
+    const active = document.querySelector(`.tab[data-tab="${tab}"]`);
+    if (active) active.classList.add('bg-black','text-white');
+  }
+
+  function renderList(){
+    list.innerHTML='';
+    const items = filteredJobs();
+    if(!items.length){
+      const div=document.createElement('div'); div.className='text-center text-gray-500'; div.textContent='No jobs here yet.'; list.appendChild(div); return;
+    }
+    for(const job of items){
+      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
+      const row=document.createElement('div'); row.className='flex justify-between items-center';
+      const left=document.createElement('div');
+      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
+      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
+      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
+
+      const mm = masterMaterialFor(job.material);
+      const unit = (mm?.unit || (/fill|top|sand/i.test(job.material||'')?'yard':'ton'));
+      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
+      meta.textContent=[job.material, job.loadSize? (job.loadSize+' '+(unit+(Number(job.loadSize)>1?'s':''))):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+
+      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+
+      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
+      const actions=document.createElement('div'); actions.className='flex gap-2';
+
+      const editBtn=document.createElement('button'); editBtn.className='rounded-xl px-3 py-1 border text-sm'; editBtn.textContent='Edit'; editBtn.type='button'; editBtn.setAttribute('data-action','edit'); editBtn.setAttribute('data-id', job.id);
+      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)'; goBtn.textContent='GO'; goBtn.onclick=()=>openAppleMaps(selectedHub, job.address);
+      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
+      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o); });
+      statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
+      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
+      delBtn.onclick=()=>{ if(confirm('Delete this job?')){ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); } };
+
+      actions.appendChild(editBtn); right.appendChild(actions); right.appendChild(goBtn); right.appendChild(statusSel); right.appendChild(delBtn);
+      row.appendChild(left); row.appendChild(right); card.appendChild(row); list.appendChild(card);
+    }
+  }
+  window.renderList = renderList;
+
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.onclick=()=>{ tab = btn.dataset.tab; localStorage.setItem('dt_tab', tab); paintActiveTab(); renderList(); };
+  });
+  hubSelect.onchange=()=>{ selectedHub = hubSelect.value; writeLS('dt_selected_hub', selectedHub); };
+
+  addJobBtn.onclick=()=>{
+    calcPrice();
+    const qty = loadSizeI.value ? parseFloat(loadSizeI.value) : null;
+    const job={
+      id: uid(),
+      date: normalizeDate(dateI.value || todayStr()),
+      time: timeI.value || '',
+      customer: customerI.value || '',
+      address: addressI.value || '',
+      material: materialI.value || '',
+      loadSize: qty || '',
+      price: priceI.value || '',
+      status: statusI.value || 'Scheduled'
+    };
+    if(!job.address || !job.customer){
+      alert('Add a Customer and Address to save the job.'); return;
+    }
+    jobs.push(job); saveJobs();
+    timeI.value = customerI.value = addressI.value = ''; materialI.value=''; loadSizeI.innerHTML=''; priceI.value=''; statusI.value='Scheduled'; dateI.value = todayStr();
+    repopulateQtyOptions(); renderList();
+  };
+
+  exportBtn.onclick = () => {
+    const data = JSON.stringify({ hubs, selectedHub, jobs }, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `asg-jobs-${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+
+  importInput.onchange = async () => {
+    // ---------------- Generate Receipt wiring ----------------
+const genReceiptBtn = document.getElementById('generateReceiptBtn');
+if (genReceiptBtn) {
+  genReceiptBtn.onclick = () => {
+    // Make sure a price is calculated from the master if possible
+    calcPrice();
+
+    // Zone info
+    const zoneId = localStorage.getItem(ZONE_KEY) || 'zone1';
+    const zoneLabel = (zoneId === 'zone2') ? 'Zone 2' : 'Zone 1';
+
+    // Material & unit
+    const matLabel = materialI.value || materialI.options[materialI.selectedIndex]?.text?.trim() || '';
+    const mm = masterMaterialFor(matLabel);
+    const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+    // Quantity & total (your app uses the full delivery-included price in #price)
+    const qty = loadSizeI.value ? Number(loadSizeI.value) : 1;
+    const total = Number(priceI.value || 0);
+
+    // Required fields check
+    if (!customerI.value || !addressI.value || !matLabel || !total) {
+      alert('Need Customer, Address, Material, and Price before generating a receipt.');
+      return;
+    }
+
+    // Build the job payload for the receipt page
+    const job = {
+      customerName: (customerI.value || '').trim(),
+      phone: '', // optional – add a phone field later if you want
+      address: (addressI.value || '').trim(),
+      date: (dateI.value || todayStr()),
+      material: matLabel,
+      quantity: qty,
+      unit: (unit === 'yard' ? 'yd' : 'ton'), // receipt expects 'yd' or 'ton'
+      zone: zoneLabel,
+      unitPrice: total, // your final customer charge (delivery included)
+      notes: '',
+      paid: true,       // set false if you want it to show as DUE
+      method: 'Cash'    // Cash | Card | Zelle | Venmo | Other
+    };
+
+    // Hand off to the receipt page
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+    window.location.href = './receipt.html';
+  };
+}
+
+    const f = importInput.files[0]; if(!f) return;
+    const text = await f.text();
+    try {
+      const obj = JSON.parse(text);
+      if(Array.isArray(obj.hubs)) hubs = obj.hubs;
+      if(obj.selectedHub) selectedHub = obj.selectedHub;
+      if(Array.isArray(obj.jobs)) jobs = obj.jobs;
+      writeLS('dt_hubs', hubs); writeLS('dt_selected_hub', selectedHub); writeLS('dt_jobs', jobs);
+      renderHubs(); renderList(); if (typeof window.renderCal === 'function') window.renderCal();
+    } catch(e) { alert('Import failed: invalid JSON'); }
+    importInput.value = '';
+  };
+// ---------------- Generate Receipt (global, used by inline onclick) ----------------
+function generateReceiptNow() {
+  try {
+    if (typeof calcPrice === 'function') calcPrice();
+
+    const zoneId = localStorage.getItem("HAULING_SELECTED_ZONE") || "zone1";
+    const zoneLabel = (zoneId === "zone2") ? "Zone 2" : "Zone 1";
+
+    const materialI = document.getElementById('material');
+    const matLabel =
+      materialI?.value ||
+      materialI?.options[materialI.selectedIndex]?.text?.trim() ||
+      '';
+    const mm = (typeof masterMaterialFor === 'function') ? masterMaterialFor(matLabel) : null;
+    const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+    const customerI = document.getElementById('customer');
+    const addressI  = document.getElementById('address');
+    const dateI     = document.getElementById('date');
+    const loadSizeI = document.getElementById('loadSize');
+    const priceI    = document.getElementById('price');
+
+    const qty   = loadSizeI?.value ? Number(loadSizeI.value) : 1;
+    const total = Number(priceI?.value || 0);
+
+    if (!customerI?.value || !addressI?.value || !matLabel || !total) {
+      alert('Need Customer, Address, Material, and Price before generating a receipt.');
+      return;
+    }
+
+    const todayStr = () => new Date().toISOString().slice(0,10);
+    const job = {
+      customerName: (customerI.value || '').trim(),
+      phone: '',
+      address: (addressI.value || '').trim(),
+      date: (dateI?.value || todayStr()),
+      material: matLabel,
+      quantity: qty,
+      unit: (unit === 'yard' ? 'yd' : 'ton'),
+      zone: zoneLabel,
+      unitPrice: total,
+      notes: '',
+      paid: true,
+      method: 'Cash'
+    };
+
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+    window.location.href = './receipt.html';
+  } catch (e) {
+    console.error('Generate receipt failed:', e);
+    alert('Generate receipt failed. Check Console for details.');
   }
 }
-window.renderList=renderList;
 
-// Generator
-window.generateDocFromJob=function(jobId,type){
-  try{
-    const j=(window.jobs||[]).find(r=>r.id===jobId);
-    if(!j){alert('Job not found.');return;}
-    const zoneId=localStorage.getItem("HAULING_SELECTED_ZONE")||"zone1";
-    const zoneLabel=(zoneId==="zone2")?"Zone 2":"Zone 1";
-    const matLabel=j.material||'';
-    const mm=(typeof masterMaterialFor==='function')?masterMaterialFor(matLabel):null;
-    const unit=(mm?.unit||(/fill|top|sand/i.test(matLabel)?'yard':'ton')).toLowerCase();
-    const qty=j.loadSize?Number(j.loadSize):1;
-    const total=j.price?Number(j.price):0;
-    if(!j.customer||!j.address||!matLabel||!total){
-      alert('Missing info in this job.');return;
+  renderHubs(); dateI.value = todayStr(); paintActiveTab(); renderList();
+
+  /* ---------------- Zone FAB + Price Sync ---------------- */
+  (function(){
+    let m = getMaster();
+    let zoneId = localStorage.getItem(ZONE_KEY) || (m.zones?.[0]?.id || 'zone1');
+
+    // FAB
+    const fab = document.createElement('div'); fab.className='zone-fab'; fab.id='zoneFab';
+    fab.innerHTML = '<span style="font-weight:600;opacity:.9">Zone</span><button type="button" data-zone="zone1">1</button><button type="button" data-zone="zone2">2</button>';
+    document.body.appendChild(fab);
+    function paintZone(){ fab.querySelectorAll('button[data-zone]').forEach(b=> b.classList.toggle('active', b.dataset.zone===zoneId)); }
+    fab.addEventListener('click', (e)=>{ const btn = e.target.closest('button[data-zone]'); if (!btn) return; zoneId = btn.dataset.zone; localStorage.setItem(ZONE_KEY, zoneId); paintZone(); if (window.repopulateQtyOptions) window.repopulateQtyOptions(); updatePrice(); });
+    paintZone();
+
+    // Chip
+    const chip = document.createElement('div'); chip.className='zone-chip';
+    (priceI?.parentElement || loadSizeI.parentElement || materialI.parentElement).appendChild(chip);
+
+    function materialByLabel(label){
+      m = getMaster();
+      const arr = Array.isArray(m.materials) ? m.materials : (m.materials && typeof m.materials==='object' ? Object.values(m.materials) : []);
+      return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase());
     }
-    const todayStr=()=>new Date().toISOString().slice(0,10);
-    const doc={
-      docType:(type==='invoice'?'invoice':'receipt'),
-      customerName:(j.customer||'').trim(),
-      phone:'',
-      address:(j.address||'').trim(),
-      date:(j.date||todayStr()),
-      material:matLabel,
-      quantity:qty,
-      unit:(unit==='yard'?'yd':'ton'),
-      zone:zoneLabel,
-      unitPrice:total,
-      notes:'',
-      paid:(type==='receipt'),
-      method:'Cash'
+    function qtyNumber(){ const t = String(loadSizeI.value||''); const r = t.match(/\d+/); return r ? Number(r[0]) : Number(t)||1; }
+    function priceFor(material, zoneId, qty){
+      const tiers = material?.tiersByZone?.[zoneId] || [];
+      const t = tiers.find(tt => Number(tt.qty) === Number(qty));
+      if (!t) return null;
+      const base = Number(t.price||0);
+      const total = material.minEnabled ? Math.max(base, Number(material.minimum||0)) : base;
+      return { base, total };
+    }
+    function updatePrice(){
+      const matLabel = materialI.options[materialI.selectedIndex]?.text?.trim();
+      const mat = materialByLabel(matLabel);
+      const qty = qtyNumber();
+      if (!mat) { chip.textContent = 'No master price for this material'; return; }
+      const p = priceFor(mat, zoneId, qty);
+      if (!p) { chip.textContent='No price set for this qty/zone'; return; }
+      chip.textContent = `Price (from master, ${zoneId==='zone2'?'Zone 2':'Zone 1'}): $${p.total.toFixed(0)}`;
+      if (priceI) {
+        priceI.value = p.total;
+        priceI.dispatchEvent(new Event('input', {bubbles:true}));
+        priceI.dispatchEvent(new Event('change', {bubbles:true}));
+      }
+    }
+    materialI.addEventListener('change', updatePrice);
+    loadSizeI.addEventListener('change', updatePrice);
+    if (window.repopulateQtyOptions) window.repopulateQtyOptions();
+    updatePrice();
+
+    // Hide FAB on scroll
+    (function(){
+      const MIN_DELTA=6, TOP=10, BOT=20;
+      const st=document.createElement('style');
+      st.textContent=`.zone-fab{transition:transform .25s ease,opacity .2s ease;will-change:transform}.zone-fab.is-hidden{transform:translateY(calc(100% + 24px));opacity:0;pointer-events:none}@media (prefers-reduced-motion: reduce){.zone-fab{transition:none}}`;
+      document.head.appendChild(st);
+      let lastY=window.scrollY,ticking=false;
+      function onScroll(){
+        const y=window.scrollY, dy=y-lastY; lastY=y;
+        const nearTop=y<TOP; const nearBottom=(window.innerHeight+y)>(document.body.offsetHeight-BOT);
+        const shouldHide=dy>MIN_DELTA && !nearTop && !nearBottom;
+        fab.classList.toggle('is-hidden', shouldHide);
+        ticking=false;
+      }
+      window.addEventListener('scroll', ()=>{ if(!ticking){ requestAnimationFrame(onScroll); ticking=true; } }, {passive:true});
+      ['touchstart','mousemove','focusin','click'].forEach(ev=>{ window.addEventListener(ev, ()=> fab.classList.remove('is-hidden'), {passive:true}); });
+    })();
+  })();
+
+  /* ---------------- Edit Modal + Delegation ---------------- */
+  (function(){
+    const ensure = (id, maker) => document.getElementById(id) || maker();
+    ensure('editJobModal', () => {
+      const m = document.createElement('div'); m.id = 'editJobModal';
+      m.style.cssText = 'position:fixed;inset:0;display:none;z-index:10000;background:rgba(0,0,0,.4);';
+      m.innerHTML = `
+        <div style="position:absolute;left:12px;right:12px;top:10%;margin:auto;max-width:720px;background:#fff;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.25)">
+          <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:800">Edit Job</div>
+            <div><button id="editCancel" class="rounded-xl border px-3 py-1 mr-2">Cancel</button><button id="editSave" class="rounded-xl px-3 py-1 text-white" style="background:#111">Save</button></div>
+          </div>
+          <div style="padding:12px 16px">
+            <div class="grid grid-cols-2 gap-2">
+              <input id="e_date" class="rounded-xl border px-3 py-2" placeholder="Date (YYYY-MM-DD)" />
+              <input id="e_time" class="rounded-xl border px-3 py-2" placeholder="Time" />
+              <input id="e_customer" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Customer name" />
+              <input id="e_address" class="rounded-xl border px-3 py-2 col-span-2" placeholder="Address" />
+              <select id="e_material" class="rounded-xl border px-3 py-2"></select>
+              <input id="e_loadSize" type="number" min="0" step="0.01" class="rounded-xl border px-3 py-2" placeholder="Tons/Yards" />
+              <input id="e_price" type="number" min="0" step="0.01" class="rounded-xl border px-3 py-2" placeholder="Price" />
+              <select id="e_status" class="rounded-xl border px-3 py-2"><option>Scheduled</option><option>In Progress</option><option>Complete</option><option>Canceled</option></select>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(m); return m;
+    });
+
+    function closeEdit(){ document.getElementById('editJobModal').style.display = 'none'; }
+    document.getElementById('editCancel').onclick = closeEdit;
+
+    // Populate material list on open
+    window.openEdit = function(job){
+      const srcSel = document.getElementById('material');
+      const eMat = document.getElementById('e_material');
+      eMat.innerHTML='';
+      if (srcSel) Array.from(srcSel.options).forEach(o=>{
+        const label=(o.textContent||'').trim(); if(!label) return;
+        const opt=document.createElement('option'); opt.value=label; opt.textContent=label; eMat.appendChild(opt);
+      });
+      document.getElementById('e_date').value = job.date || '';
+      document.getElementById('e_time').value = job.time || '';
+      document.getElementById('e_customer').value = job.customer || '';
+      document.getElementById('e_address').value = job.address || '';
+      document.getElementById('e_material').value = job.material || '';
+      document.getElementById('e_loadSize').value = job.loadSize || '';
+      document.getElementById('e_price').value = job.price || '';
+      document.getElementById('e_status').value = job.status || 'Scheduled';
+      document.getElementById('editJobModal').style.display = 'block';
     };
-    localStorage.setItem('ASG_RECEIPT',JSON.stringify(doc));
-    window.location.href='./receipt.html';
-  }catch(e){
-    console.error('Generate doc failed',e);
-    alert('Could not generate document.');
-  }
-};
+
+    document.getElementById('editSave').onclick = () => {
+      const idEl = document.querySelector('[data-editing]');
+      const id = idEl ? idEl.dataset.editing : null;
+      let idx=-1, j=null;
+      if(id){ idx = (jobs||[]).findIndex(r=>r.id===id); j = jobs[idx]; }
+      if(!j){
+        const ec = document.getElementById('e_customer').value.trim();
+        const ed = document.getElementById('e_date').value.trim();
+        j = (jobs||[]).find(r=> (r.customer||'')===ec && (r.date||'')===ed ) || null;
+        idx = j ? (jobs||[]).indexOf(j) : -1;
+      }
+      if(!j || idx<0){ closeEdit(); return; }
+      j.date     = document.getElementById('e_date').value.trim() || j.date;
+      j.time     = document.getElementById('e_time').value.trim();
+      j.customer = document.getElementById('e_customer').value.trim();
+      j.address  = document.getElementById('e_address').value.trim();
+      j.material = document.getElementById('e_material').value;
+      j.loadSize = document.getElementById('e_loadSize').value ? parseFloat(document.getElementById('e_loadSize').value) : '';
+      j.price    = document.getElementById('e_price').value ? parseFloat(document.getElementById('e_price').value) : '';
+      j.status   = document.getElementById('e_status').value || j.status;
+      saveJobs(); renderList(); closeEdit();
+    };
+
+    // Delegated edit click (cards + calendar)
+    document.addEventListener('click', function(e){
+      const btn=e.target.closest('[data-action="edit"],[data-edit-id]'); if(!btn) return;
+      const id = btn.getAttribute('data-id') || btn.getAttribute('data-edit-id');
+      if(!id){
+        const card = btn.closest('[data-id]');
+        if(card){
+          const cid=card.getAttribute('data-id');
+          const rec = (jobs||[]).find(x=>x.id===cid);
+          if(rec) return openEdit(rec);
+        }
+        return;
+      }
+      const rec = (jobs||[]).find(x=>x.id===id);
+      if(rec) openEdit(rec);
+    }, {passive:true});
+  })();
+
+  /* ---------------- Calendar ---------------- */
+  (function(){
+    if (window.__asgCalendarLoaded) return; window.__asgCalendarLoaded = true;
+    const $=s=>document.querySelector(s);
+    const pad2=n=>String(n).padStart(2,'0');
+    const ymd=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+    const addDays=(d,n)=>{const x=new Date(d); x.setDate(x.getDate()+n); return x;};
+    const grid=$('#calGrid'), title=$('#calTitle'), shelf=$('#calDayShelf'), dayLabel=$('#calDayLabel'), dayJobs=$('#calDayJobs'), dayCounts=$('#calDayCounts');
+    function monthMatrix(y,m){ const first=new Date(y,m,1); const start=addDays(first,-first.getDay()); const cells=[]; for(let i=0;i<42;i++) cells.push(addDays(start,i)); return cells; }
+    function jobsByDate(){ const map={}; (jobs||[]).forEach(j=>{ const d=j.date||''; if(!d) return; (map[d]||(map[d]=[])).push(j); }); return map; }
+    let viewDate=new Date();
+    function renderCal(){
+      if(!grid||!title) return;
+      const y=viewDate.getFullYear(), m=viewDate.getMonth(), now=new Date();
+      title.textContent=viewDate.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+      const matrix=monthMatrix(y,m), by=jobsByDate();
+      grid.innerHTML='';
+      matrix.forEach(d=>{
+        const other=d.getMonth()!==m, today=ymd(d)===ymd(now), key=ymd(d), jlist=by[key]||[];
+        const el=document.createElement('button');
+        el.type='button'; el.className=['rounded-xl px-2 py-1 text-left h-16 border', other?'bg-gray-50 text-gray-400':'bg-white', today?'ring-2 ring-black':''].join(' ');
+        const count=jlist.length, s=jlist.filter(j=>j.status==='Scheduled').length, ip=jlist.filter(j=>j.status==='In Progress').length, c=jlist.filter(j=>j.status==='Complete').length;
+        el.innerHTML=`<div class="flex items-start justify-between"><div class="text-sm font-semibold">${d.getDate()}</div>${count?`<span class="cal-badge">${count}</span>`:''}</div><div class="mt-1 flex gap-1">${s?`<span class="inline-block w-2 h-2 rounded-full bg-blue-500" title="Scheduled: ${s}"></span>`:''}${ip?`<span class="inline-block w-2 h-2 rounded-full bg-yellow-500" title="In Progress: ${ip}"></span>`:''}${c?`<span class="inline-block w-2 h-2 rounded-full bg-green-500" title="Complete: ${c}"></span>`:''}</div>`;
+        el.addEventListener('click',()=>openDay(key));
+        el.addEventListener('dblclick',()=>{ const di=document.getElementById('date'); if(di) di.value=key; const cust=document.getElementById('customer'); if(cust) cust.focus(); window.scrollTo({top:0,behavior:'smooth'}); });
+        grid.appendChild(el);
+      });
+    }
+    function openDay(ds){
+      if(!shelf) return;
+      dayLabel.textContent=`Jobs on ${ds}`;
+      const items=(jobs||[]).filter(j=>j.date===ds);
+      const s=items.filter(j=>j.status==='Scheduled').length, ip=items.filter(j=>j.status==='In Progress').length, c=items.filter(j=>j.status==='Complete').length, x=items.filter(j=>j.status==='Canceled').length;
+      dayCounts.textContent=`${items.length} total • S:${s} • IP:${ip} • C:${c} • X:${x}`;
+      dayJobs.innerHTML='';
+      if(!items.length){
+        dayJobs.innerHTML='<div class="text-gray-500 text-sm">No jobs on this day.</div>';
+      } else {
+        items.sort((a,b)=> (a.time||'').localeCompare(b.time||''));
+        items.forEach(j=>{
+          const card=document.createElement('div'); card.className='rounded-xl border p-2';
+          card.innerHTML=`<div class="flex items-center justify-between"><div class="font-medium text-sm">${j.customer||'(No name)'} <span class="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100">${j.status||'Scheduled'}</span></div><button class="text-xs underline" data-action="edit" data-edit-id="${j.id}">Edit</button></div><div class="text-xs text-gray-600">${j.time||''} • ${j.material||''}${j.loadSize?` • ${j.loadSize}`:''}</div><div class="text-xs">${j.address||''}</div>`;
+          dayJobs.appendChild(card);
+        });
+      }
+      shelf.classList.remove('hidden');
+      const di=document.getElementById('date'); if(di) di.value=ds;
+    }
+
+    document.getElementById('calPrev')?.addEventListener('click',()=>{ viewDate.setMonth(viewDate.getMonth()-1); window.renderCal = renderCal; renderCal(); });
+    document.getElementById('calNext')?.addEventListener('click',()=>{ viewDate.setMonth(viewDate.getMonth()+1); renderCal(); });
+    document.getElementById('calToday')?.addEventListener('click',()=>{ viewDate=new Date(); renderCal(); openDay(ymd(new Date())); });
+
+    const origSave=window.saveJobs||function(){}; window.saveJobs=function(){ origSave.apply(this,arguments); renderCal(); };
+    const origRender=window.renderList||function(){}; window.renderList=function(){ origRender.apply(this,arguments); renderCal(); };
+    renderCal();
+  })();
+
+  // Final safety: hide splash after init
+  (function(){ const s=document.getElementById('splash'); if(s) setTimeout(()=> s.classList.add('hide'), 350); })();
+})();
 </script>
+  <script>
+  // Make the handler truly global so the button can find it
+  window.generateReceiptNow = function () {
+    try {
+      // Pull DOM fields
+      const customerI = document.getElementById('customer');
+      const addressI  = document.getElementById('address');
+      const dateI     = document.getElementById('date');
+      const materialI = document.getElementById('material');
+      const loadSizeI = document.getElementById('loadSize');
+      const priceI    = document.getElementById('price');
+
+      // Ensure price is populated (uses your existing function if present)
+      if (typeof calcPrice === 'function') calcPrice();
+
+      // Zone label
+      const zoneId = localStorage.getItem("HAULING_SELECTED_ZONE") || "zone1";
+      const zoneLabel = (zoneId === "zone2") ? "Zone 2" : "Zone 1";
+
+      // Material + unit
+      const matLabel =
+        materialI?.value ||
+        materialI?.options[materialI.selectedIndex]?.text?.trim() || '';
+      const mm = (typeof masterMaterialFor === 'function') ? masterMaterialFor(matLabel) : null;
+      const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+      // Qty + total
+      const qty   = loadSizeI?.value ? Number(loadSizeI.value) : 1;
+      const total = Number(priceI?.value || 0);
+
+      // Guard
+      if (!customerI?.value || !addressI?.value || !matLabel || !total) {
+        alert('Need Customer, Address, Material, and Price before generating a receipt.');
+        return;
+      }
+
+      const todayStr = () => new Date().toISOString().slice(0,10);
+      const job = {
+        customerName: (customerI.value || '').trim(),
+        phone: '',
+        address: (addressI.value || '').trim(),
+        date: (dateI?.value || todayStr()),
+        material: matLabel,
+        quantity: qty,
+        unit: (unit === 'yard' ? 'yd' : 'ton'),
+        zone: zoneLabel,
+        unitPrice: total,   // final charge (delivery included)
+        notes: '',
+        paid: true,
+        method: 'Cash'
+      };
+
+      localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+      window.location.href = './receipt.html';
+    } catch (e) {
+      console.error('Generate receipt failed:', e);
+      alert('Generate receipt failed. Check Console for details.');
+    }
+  };
+</script>
+
 </body>
 </html>
