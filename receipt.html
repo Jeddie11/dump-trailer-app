@@ -20,4 +20,102 @@
     .logo{width:54px;height:54px;border-radius:50%;background:#111;border:3px solid var(--brand);display:grid;place-items:center;color:#fff;font-weight:800}
     .brand h1{margin:0;font-size:20px}
     .brand p{margin:0;color:var(--muted);font-size:13px}
-    .badge
+    .badge{padding:4px 10px;border-radius:8px;border:2px solid green;color:green;font-size:13px;font-weight:700}
+    .section{margin:16px 0}
+    .label{font-size:13px;color:var(--muted);margin-bottom:2px}
+    .value{font-size:15px;font-weight:500}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid var(--border)}
+    th{font-size:13px;color:var(--muted)}
+    td{font-size:14px}
+    .total-row td{font-weight:700;font-size:15px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="toolbar">
+      <button class="btn" onclick="window.print()">Print</button>
+      <button class="btn brand" onclick="history.back()">Back</button>
+    </div>
+    <div class="receipt" id="receiptArea">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+const el=document.getElementById('receiptArea');
+(function(){
+  try{
+    const raw=localStorage.getItem('ASG_RECEIPT');
+    if(!raw){el.innerHTML='<p style="color:red">No receipt data.</p>';return;}
+    const m=JSON.parse(raw);
+
+    // Badge color
+    const badgeHTML = m.paid
+      ? '<div class="badge">PAID</div>'
+      : '<div class="badge" style="border-color:#f59e0b;color:#b45309">DUE</div>';
+
+    el.innerHTML=`
+      <div class="head">
+        <div class="brand">
+          <div class="logo">ASG</div>
+          <div>
+            <h1>Augusta Sand & Gravel</h1>
+            <p>Material Hauling</p>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin:0">${m.docType==='invoice'?'Invoice':'Receipt'}</h3>
+          ${badgeHTML}
+        </div>
+      </div>
+      <div class="section">
+        <div class="label">Customer</div>
+        <div class="value">${m.customerName||''}</div>
+      </div>
+      <div class="section">
+        <div class="label">Address</div>
+        <div class="value">${m.address||''}</div>
+      </div>
+      <div class="section">
+        <div class="label">Date</div>
+        <div class="value">${m.date||''}</div>
+      </div>
+      <div class="section">
+        <div class="label">Zone</div>
+        <div class="value">${m.zone||''}</div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Material</th><th>Qty</th><th>Unit</th><th>Price</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${m.material||''}</td>
+            <td>${m.quantity||''}</td>
+            <td>${m.unit||''}</td>
+            <td>$${m.unitPrice||0}</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="3">Total</td>
+            <td>$${m.unitPrice||0}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="section">
+        <div class="label">Payment Method</div>
+        <div class="value">${m.method||''}</div>
+      </div>
+      ${m.notes?`<div class="section"><div class="label">Notes</div><div class="value">${m.notes}</div></div>`:''}
+    `;
+    localStorage.removeItem('ASG_RECEIPT');
+  }catch(e){
+    console.error(e);
+    el.innerHTML='<p style="color:red">Error loading receipt.</p>';
+  }
+})();
+</script>
+</body>
+</html>
