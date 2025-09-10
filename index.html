@@ -334,43 +334,83 @@
     if (active) active.classList.add('bg-black','text-white');
   }
 
-  function renderList(){
-    list.innerHTML='';
-    const items = filteredJobs();
-    if(!items.length){
-      const div=document.createElement('div'); div.className='text-center text-gray-500'; div.textContent='No jobs here yet.'; list.appendChild(div); return;
-    }
-    for(const job of items){
-      const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
-      const row=document.createElement('div'); row.className='flex justify-between items-center';
-      const left=document.createElement('div');
-      const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
-      const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
-      const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
-
-      const mm = masterMaterialFor(job.material);
-      const unit = (mm?.unit || (/fill|top|sand/i.test(job.material||'')?'yard':'ton'));
-      const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
-      meta.textContent=[job.material, job.loadSize? (job.loadSize+' '+(unit+(Number(job.loadSize)>1?'s':''))):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
-
-      left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
-
-      const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
-      const actions=document.createElement('div'); actions.className='flex gap-2';
-
-      const editBtn=document.createElement('button'); editBtn.className='rounded-xl px-3 py-1 border text-sm'; editBtn.textContent='Edit'; editBtn.type='button'; editBtn.setAttribute('data-action','edit'); editBtn.setAttribute('data-id', job.id);
-      const goBtn=document.createElement('button'); goBtn.className='rounded-xl px-3 py-2 text-black'; goBtn.style.background='var(--brand-yellow)'; goBtn.textContent='GO'; goBtn.onclick=()=>openAppleMaps(selectedHub, job.address);
-      const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
-      ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o); });
-      statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
-      const delBtn=document.createElement('button'); delBtn.className='text-red-600 text-sm'; delBtn.textContent='Delete';
-      delBtn.onclick=()=>{ if(confirm('Delete this job?')){ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); } };
-
-      actions.appendChild(editBtn); right.appendChild(actions); right.appendChild(goBtn); right.appendChild(statusSel); right.appendChild(delBtn);
-      row.appendChild(left); row.appendChild(right); card.appendChild(row); list.appendChild(card);
-    }
+ <script>
+// REPLACE your existing renderList() with this version
+function renderList(){
+  list.innerHTML='';
+  const items = filteredJobs();
+  if(!items.length){
+    const div=document.createElement('div');
+    div.className='text-center text-gray-500';
+    div.textContent='No jobs here yet.';
+    list.appendChild(div);
+    return;
   }
-  window.renderList = renderList;
+  for(const job of items){
+    const card=document.createElement('div'); card.className='bg-white rounded-2xl shadow p-3'; card.dataset.id = job.id;
+    const row=document.createElement('div'); row.className='flex justify-between items-center';
+
+    const left=document.createElement('div');
+    const name=document.createElement('div'); name.className='font-medium'; name.textContent=job.customer || '(No name)';
+    const dt=document.createElement('div'); dt.className='text-sm text-gray-600'; dt.textContent=job.date+' '+(job.time||'');
+    const addr=document.createElement('div'); addr.className='text-sm'; addr.textContent=job.address;
+
+    const mm = masterMaterialFor(job.material);
+    const unit = (mm?.unit || (/fill|top|sand/i.test(job.material||'')?'yard':'ton'));
+    const meta=document.createElement('div'); meta.className='text-xs text-gray-600';
+    meta.textContent=[job.material, job.loadSize? (job.loadSize+' '+(unit+(Number(job.loadSize)>1?'s':''))):'', job.price? ('$'+job.price):''].filter(Boolean).join(' • ');
+
+    left.appendChild(name); left.appendChild(dt); left.appendChild(addr); left.appendChild(meta);
+
+    const right=document.createElement('div'); right.className='flex flex-col gap-2 items-end';
+    const actions=document.createElement('div'); actions.className='flex gap-2';
+
+    const editBtn=document.createElement('button');
+    editBtn.className='rounded-xl px-3 py-1 border text-sm';
+    editBtn.textContent='Edit';
+    editBtn.type='button';
+    editBtn.setAttribute('data-action','edit');
+    editBtn.setAttribute('data-id', job.id);
+
+    // NEW: Invoice (unpaid) button
+    const invBtn=document.createElement('button');
+    invBtn.className='rounded-xl px-3 py-1 border text-sm';
+    invBtn.textContent='Invoice';
+    invBtn.type='button';
+    invBtn.onclick=()=>window.generateDocFromJob(job.id);
+
+    const goBtn=document.createElement('button');
+    goBtn.className='rounded-xl px-3 py-2 text-black';
+    goBtn.style.background='var(--brand-yellow)';
+    goBtn.textContent='GO';
+    goBtn.onclick=()=>openAppleMaps(selectedHub, job.address);
+
+    const statusSel=document.createElement('select'); statusSel.className='rounded-xl border px-2 py-1 text-sm';
+    ['Scheduled','In Progress','Complete','Canceled'].forEach(s=>{
+      const o=document.createElement('option'); o.value=s; o.textContent=s; if(s===job.status) o.selected=true; statusSel.appendChild(o);
+    });
+    statusSel.onchange=()=>{ job.status=statusSel.value; saveJobs(); renderList(); };
+
+    const delBtn=document.createElement('button');
+    delBtn.className='text-red-600 text-sm';
+    delBtn.textContent='Delete';
+    delBtn.onclick=()=>{ if(confirm('Delete this job?')){ jobs = jobs.filter(j => j.id !== job.id); saveJobs(); renderList(); } };
+
+    // Put buttons in the row
+    actions.appendChild(editBtn);
+    actions.appendChild(invBtn);
+
+    right.appendChild(actions);
+    right.appendChild(goBtn);
+    right.appendChild(statusSel);
+    right.appendChild(delBtn);
+
+    row.appendChild(left); row.appendChild(right); card.appendChild(row); list.appendChild(card);
+  }
+}
+window.renderList = renderList;
+</script>
+ 
 
   document.querySelectorAll('.tab').forEach(btn=>{
     btn.onclick=()=>{ tab = btn.dataset.tab; localStorage.setItem('dt_tab', tab); paintActiveTab(); renderList(); };
@@ -806,6 +846,63 @@ function generateReceiptNow() {
       alert('Generate receipt failed. Check Console for details.');
     }
   };
+</script>
+<script>
+// Generate an unpaid INVOICE from a saved job
+window.generateDocFromJob = function (jobId) {
+  try {
+    const j = (window.jobs || []).find(r => r.id === jobId);
+    if (!j) { alert('Job not found.'); return; }
+
+    // Zone from current FAB selection
+    const zoneId = localStorage.getItem("HAULING_SELECTED_ZONE") || "zone1";
+    const zoneLabel = (zoneId === "zone2") ? "Zone 2" : "Zone 1";
+
+    // Material & unit (falls back to tons unless it's dirt/sand/soil)
+    const matLabel = j.material || '';
+    const mm = (typeof masterMaterialFor === 'function') ? masterMaterialFor(matLabel) : null;
+    const unit = (mm?.unit || (/fill|top|sand/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+
+    // Pull qty & total from the saved job
+    const qty   = j.loadSize ? Number(j.loadSize) : 1;
+    const total = j.price ? Number(j.price) : 0;
+
+    if (!j.customer || !j.address || !matLabel || !total) {
+      alert('This job is missing Customer, Address, Material, or Price. Edit the job and try again.');
+      return;
+    }
+
+    const todayStr = () => new Date().toISOString().slice(0,10);
+    const doc = {
+      docType: 'invoice',           // tells receipt.html to show "Invoice" + DUE
+      customerName: (j.customer || '').trim(),
+      phone: '',
+      address: (j.address || '').trim(),
+      date: (j.date || todayStr()),
+      material: matLabel,
+      quantity: qty,
+      unit: (unit === 'yard' ? 'yd' : 'ton'),
+      zone: zoneLabel,
+      unitPrice: total,
+      notes: '',                    // optional: add default invoice terms here
+      paid: false,                  // unpaid
+      method: 'Cash'                // or Card/Zelle/Venmo/etc
+    };
+
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(doc));
+
+    // Robust navigation to receipt.html (works on GitHub Pages subpaths)
+    (function(){
+      const here = location.pathname;
+      const basePath = here.endsWith('/') ? here : here.replace(/[^/]+$/, '');
+      const url = location.origin + basePath + 'receipt.html?v=' + Date.now();
+      window.location.assign(url);
+    })();
+  } catch (e) {
+    console.error('Generate invoice failed:', e);
+    alert('Could not generate invoice.');
+  }
+};
 </script>
 
 </body>
