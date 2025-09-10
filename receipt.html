@@ -3,118 +3,181 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Augusta Sand & Gravel — Receipt</title>
+  <title>ASG — Receipt</title>
   <style>
-    :root{
-      --bg:#0b0b0c;--paper:#ffffff;--ink:#111827;--muted:#6b7280;--brand:#FACC15;--border:#e5e7eb;
-    }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    /* Safe-mode styles: white background + clear content */
+    html,body{margin:0;padding:0;background:#ffffff;color:#111827;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
     .wrap{max-width:920px;margin:24px auto;padding:16px}
-    .card{background:var(--paper);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px}
-    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
-    .btn.brand{background:var(--brand);border-color:#d4b014}
-    .receipt{padding:28px}
-    .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
-    .brand{display:flex;align-items:center;gap:14px}
-    .logo{width:54px;height:54px;border-radius:50%;background:#111;border:3px solid var(--brand);display:grid;place-items:center;color:#fff;font-weight:800}
-    .brand h1{margin:0;font-size:20px}
-    .brand p{margin:0;color:var(--muted);font-size:13px}
-    .badge{padding:4px 10px;border-radius:8px;border:2px solid green;color:green;font-size:13px;font-weight:700}
-    .section{margin:16px 0}
-    .label{font-size:13px;color:var(--muted);margin-bottom:2px}
-    .value{font-size:15px;font-weight:500}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:8px;text-align:left;border-bottom:1px solid var(--border)}
-    th{font-size:13px;color:var(--muted)}
-    td{font-size:14px}
-    .total-row td{font-weight:700;font-size:15px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px;border-bottom:1px solid #f1f5f9;background:#fafafa}
+    .btn{appearance:none;border:1px solid #e5e7eb;background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
+    .btn.brand{background:#FACC15;border-color:#eab308}
+    .content{padding:20px}
+    .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:48px;height:48px;border-radius:50%;background:#111;color:#fff;display:grid;place-items:center;font-weight:800;border:3px solid #FACC15}
+    .sub{color:#6b7280;font-size:12px}
+    .badge{padding:4px 10px;border-radius:8px;border:2px solid #16a34a;color:#166534;font-size:13px;font-weight:700}
+    .badge.due{border-color:#f59e0b;color:#b45309}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+    .box{border:1px solid #e5e7eb;border-radius:12px;padding:10px}
+    .box h3{margin:0 0 6px 0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
+    .row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}
+    .k{color:#6b7280}
+    .v{font-weight:600}
+    table{width:100%;border-collapse:collapse;margin-top:10px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
+    thead th{background:#fafafa;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;padding:10px;text-align:left;border-bottom:1px solid #e5e7eb}
+    tbody td{padding:12px;border-bottom:1px solid #f3f4f6}
+    tfoot td{padding:12px;font-weight:700}
+    .right{text-align:right}
+    .note{margin-top:10px;color:#6b7280;font-size:12px}
+    .empty{padding:40px;text-align:center;color:#374151}
+    .empty strong{display:block;font-size:18px;margin-bottom:6px}
+    .help{margin-top:8px;color:#6b7280;font-size:13px}
+    @media print{ .toolbar{display:none} .wrap{margin:0;padding:0} .card{box-shadow:none;border:none;border-radius:0} }
   </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <div class="toolbar">
-      <button class="btn" onclick="window.print()">Print</button>
-      <button class="btn brand" onclick="history.back()">Back</button>
-    </div>
-    <div class="receipt" id="receiptArea">
-      <!-- Populated by JS -->
+  <div class="wrap">
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn brand" onclick="window.print()">Print / Save PDF</button>
+        <button class="btn" onclick="copyText()">Copy as Text</button>
+        <button class="btn" onclick="history.back()">Back</button>
+      </div>
+      <div id="receipt" class="content">
+        <div class="empty">
+          <strong>Loading receipt…</strong>
+          <div class="help">If this stays blank, go back and click <em>Receipt</em> or <em>Invoice</em> on a job.</div>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
 <script>
-const el=document.getElementById('receiptArea');
 (function(){
-  try{
-    const raw=localStorage.getItem('ASG_RECEIPT');
-    if(!raw){el.innerHTML='<p style="color:red">No receipt data.</p>';return;}
-    const m=JSON.parse(raw);
+  const $root = document.getElementById('receipt');
 
-    // Badge color
-    const badgeHTML = m.paid
-      ? '<div class="badge">PAID</div>'
-      : '<div class="badge" style="border-color:#f59e0b;color:#b45309">DUE</div>';
-
-    el.innerHTML=`
+  function fmtUSD(n){
+    const x = Number(n||0);
+    return '$' + x.toFixed(2).replace(/\.00$/,'');
+  }
+  function render(model){
+    const m = model;
+    const qtyLabel = `${m.quantity} ${m.unit}${m.quantity===1?'':'s'}`;
+    const badge = m.paid ? '<div class="badge">PAID</div>' : '<div class="badge due">DUE</div>';
+    $root.innerHTML = `
       <div class="head">
         <div class="brand">
           <div class="logo">ASG</div>
           <div>
-            <h1>Augusta Sand & Gravel</h1>
-            <p>Material Hauling</p>
+            <div style="font-weight:800">Augusta Sand &amp; Gravel</div>
+            <div class="sub">Tight-access, driveway-safe deliveries • 706-589-0657</div>
           </div>
         </div>
-        <div>
-          <h3 style="margin:0">${m.docType==='invoice'?'Invoice':'Receipt'}</h3>
-          ${badgeHTML}
+        <div style="text-align:right">
+          <div style="font-weight:800;margin-bottom:6px">${m.docType==='invoice'?'Invoice':'Receipt'}</div>
+          ${badge}
         </div>
       </div>
-      <div class="section">
-        <div class="label">Customer</div>
-        <div class="value">${m.customerName||''}</div>
+
+      <div class="grid">
+        <div class="box">
+          <h3>${m.docType==='invoice'?'Invoice':'Receipt'} Info</h3>
+          <div class="row"><span class="k">Number</span><span class="v">${m.receiptNo}</span></div>
+          <div class="row"><span class="k">Date</span><span class="v">${m.date}</span></div>
+          <div class="row"><span class="k">Zone</span><span class="v">${m.zone}</span></div>
+          <div class="row"><span class="k">Payment</span><span class="v">${m.paid?'Paid':'Due'} (${m.method})</span></div>
+        </div>
+        <div class="box">
+          <h3>Customer</h3>
+          <div class="row"><span class="k">Name</span><span class="v">${m.customerName}</span></div>
+          ${m.phone?`<div class="row"><span class="k">Phone</span><span class="v">${m.phone}</span></div>`:''}
+          ${m.address?`<div class="row"><span class="k">Address</span><span class="v">${m.address}</span></div>`:''}
+        </div>
       </div>
-      <div class="section">
-        <div class="label">Address</div>
-        <div class="value">${m.address||''}</div>
-      </div>
-      <div class="section">
-        <div class="label">Date</div>
-        <div class="value">${m.date||''}</div>
-      </div>
-      <div class="section">
-        <div class="label">Zone</div>
-        <div class="value">${m.zone||''}</div>
-      </div>
+
       <table>
-        <thead>
-          <tr><th>Material</th><th>Qty</th><th>Unit</th><th>Price</th></tr>
-        </thead>
+        <thead><tr><th>Material</th><th>Quantity</th><th>Price</th><th class="right">Total</th></tr></thead>
         <tbody>
           <tr>
-            <td>${m.material||''}</td>
-            <td>${m.quantity||''}</td>
-            <td>${m.unit||''}</td>
-            <td>$${m.unitPrice||0}</td>
-          </tr>
-          <tr class="total-row">
-            <td colspan="3">Total</td>
-            <td>$${m.unitPrice||0}</td>
+            <td>${m.material}</td>
+            <td>${qtyLabel}</td>
+            <td>${fmtUSD(m.unitPrice)}</td>
+            <td class="right">${fmtUSD(m.unitPrice)}</td>
           </tr>
         </tbody>
+        <tfoot>
+          <tr><td colspan="3">${m.docType==='invoice'?'Amount Due':'Grand Total'}</td><td class="right">${fmtUSD(m.unitPrice)}</td></tr>
+        </tfoot>
       </table>
-      <div class="section">
-        <div class="label">Payment Method</div>
-        <div class="value">${m.method||''}</div>
-      </div>
-      ${m.notes?`<div class="section"><div class="label">Notes</div><div class="value">${m.notes}</div></div>`:''}
+
+      <div class="note">${m.notes}</div>
     `;
-    localStorage.removeItem('ASG_RECEIPT');
-  }catch(e){
-    console.error(e);
-    el.innerHTML='<p style="color:red">Error loading receipt.</p>';
   }
+
+  function nextSeq(){
+    try{
+      const k='ASG_RECEIPT_SEQ';
+      const cur=parseInt(localStorage.getItem(k)||'0',10)||0;
+      const nx=cur+1; localStorage.setItem(k,String(nx));
+      return nx;
+    }catch{ return Math.floor(Math.random()*99999); }
+  }
+  function genNo(){ return 'ASG-'+String(nextSeq()).padStart(5,'0'); }
+  function today(){ return new Date().toISOString().slice(0,10); }
+
+  function normalize(job){
+    const j = job || {};
+    return {
+      docType: (j.docType==='invoice'?'invoice':'receipt'),
+      receiptNo: j.receiptNo || genNo(),
+      date: j.date || today(),
+      customerName: j.customerName || 'Customer',
+      phone: j.phone || '',
+      address: j.address || '',
+      material: j.material || 'Material',
+      quantity: Number(j.quantity||1),
+      unit: (j.unit==='yd'?'yd':'ton'),
+      zone: j.zone || 'Zone 1',
+      unitPrice: Number(j.unitPrice||0),
+      notes: j.notes || (j.docType==='invoice' ? 'Payment due upon delivery unless noted.' : 'Price includes delivery unless noted.'),
+      paid: Boolean(j.paid),
+      method: j.method || 'Cash'
+    };
+  }
+
+  try{
+    const raw = localStorage.getItem('ASG_RECEIPT');
+    if(!raw){
+      $root.innerHTML = `
+        <div class="empty">
+          <strong>No receipt data found.</strong>
+          <div class="help">Go back to the app and click <b>Receipt</b> or <b>Invoice</b> on a job.</div>
+        </div>
+      `;
+      return;
+    }
+    const job = JSON.parse(raw);
+    const model = normalize(job);
+    render(model);
+    // optional cleanup so old data doesn't stick around
+    localStorage.removeItem('ASG_RECEIPT');
+  }catch(err){
+    console.error('Receipt load error:', err);
+    $root.innerHTML = `
+      <div class="empty">
+        <strong>Error loading receipt.</strong>
+        <div class="help">Open DevTools → Console for details.</div>
+      </div>
+    `;
+  }
+
+  // copy button helper
+  window.copyText = function(){
+    const text = document.getElementById('receipt').innerText.trim();
+    navigator.clipboard?.writeText(text).then(()=> alert('Copied.')).catch(()=> alert('Copy failed.'));
+  };
 })();
 </script>
 </body>
