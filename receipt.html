@@ -1,176 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Augusta Sand & Gravel — Receipt</title>
-  <style>
-    :root{
-      --bg:#0b0b0c;--paper:#ffffff;--ink:#111827;--muted:#6b7280;--brand:#FACC15;--border:#e5e7eb;
-    }
-    html,body{margin:0;padding:0;background:#ffffff;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .wrap{max-width:920px;margin:24px auto;padding:16px}
-    .card{background:var(--paper);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 25px rgba(0,0,0,.08)}
-    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px;border-bottom:1px solid #f1f5f9;background:#fafafa}
-    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
-    .btn.brand{background:var(--brand);border-color:#d4b014}
-    .receipt{padding:22px}
-    .head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
-    .brand{display:flex;align-items:center;gap:12px}
-    .logo{width:54px;height:54px;border-radius:50%;background:#111;border:3px solid var(--brand);display:grid;place-items:center;color:#fff;font-weight:800}
-    .brand h1{margin:0;font-size:20px}
-    .brand p{margin:0;color:var(--muted);font-size:13px}
-    .badge{border:2px dashed #16a34a;color:#16a34a;border-radius:10px;padding:6px 10px;font-weight:700}
-    .badge.due{border-color:#f59e0b;color:#b45309}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
-    .box{border:1px solid var(--border);border-radius:12px;padding:10px}
-    .box h3{margin:0 0 6px 0;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}
-    .row{display:flex;justify-content:space-between;gap:8px;margin:6px 0}
-    .k{color:#6b7280}
-    .v{font-weight:600}
-    table{width:100%;border-collapse:collapse;margin-top:10px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    thead th{background:#fafafa;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;padding:10px;text-align:left;border-bottom:1px solid var(--border)}
-    tbody td{padding:12px;border-bottom:1px solid #f3f4f6}
-    tfoot td{padding:12px;font-weight:700}
-    .right{text-align:right}
-    .note{margin-top:10px;color:#6b7280;font-size:12px}
-    @media print{ .toolbar{display:none} .wrap{margin:0;padding:0} .card{box-shadow:none;border:none;border-radius:0} }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASG — Invoice / Receipt</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .inv-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:16px;max-width:720px;margin:12px auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111}
+  .inv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .badge{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge-unpaid{background:#fef3c7;color:#92400e;border:1px solid #f59e0b}
+  .badge-paid{background:#dcfce7;color:#166534;border:1px solid #22c55e}
+  .muted{color:#6b7280;font-size:12px}
+  .paid-watermark{display:none;position:fixed;inset:0;pointer-events:none;opacity:0.12;font-size:140px;font-weight:900;color:#16a34a;transform:rotate(-20deg);display:flex;align-items:center;justify-content:center}
+  .paid-active .paid-watermark{display:flex}
+  @media print{ .controls{display:none!important}; body{background:#fff} .inv-card{border:none;box-shadow:none} }
+</style>
 </head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <div class="toolbar">
-        <button class="btn brand" onclick="window.print()">Print / Save PDF</button>
-        <button class="btn" onclick="ASGReceipt.copyText()">Copy as Text</button>
-        <button class="btn" onclick="history.back()">Back</button>
+<body class="bg-slate-50">
+
+<div id="wrap">
+  <div class="paid-watermark">PAID</div>
+
+  <div class="inv-card" id="invoiceCard">
+    <div class="inv-head">
+      <div>
+        <div class="text-xl font-bold">Augusta Sand &amp; Gravel</div>
+        <div class="muted">Call/Text: 706-589-0657</div>
       </div>
-      <div id="receipt" class="receipt">
-        <!-- Rendered by JS -->
+      <div id="statusBadge" class="badge badge-unpaid">INVOICE (DUE)</div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <div>
+        <div class="text-xs text-gray-500">Invoice #</div>
+        <div class="font-semibold" id="invoiceNo">—</div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500">Invoice Date</div>
+        <div class="font-semibold" id="invoiceDate">—</div>
+      </div>
+    </div>
+
+    <hr class="my-2">
+
+    <div class="grid grid-cols-2 gap-2">
+      <p><span class="text-gray-500 text-xs">Customer</span><br><span id="cust" class="font-semibold"></span></p>
+      <p><span class="text-gray-500 text-xs">Job Address</span><br><span id="addr" class="font-semibold"></span></p>
+      <p><span class="text-gray-500 text-xs">Material</span><br><span id="mat" class="font-semibold"></span></p>
+      <p><span class="text-gray-500 text-xs">Quantity</span><br><span id="qty" class="font-semibold"></span></p>
+      <p><span class="text-gray-500 text-xs">Zone</span><br><span id="zone" class="font-semibold"></span></p>
+      <p><span class="text-gray-500 text-xs">Notes</span><br><span id="notes" class="font-semibold"></span></p>
+    </div>
+
+    <hr class="my-2">
+
+    <div class="grid grid-cols-2 gap-2">
+      <p><span class="text-gray-500 text-xs">Amount</span><br>$<span id="amount" class="font-semibold">0.00</span></p>
+      <p>
+        <span class="text-gray-500 text-xs" id="amountLabel">Amount Due</span><br>
+        $<span id="amountDue" class="font-semibold">0.00</span>
+      </p>
+    </div>
+
+    <div id="paidMeta" class="mt-2 hidden">
+      <div class="grid grid-cols-2 gap-2">
+        <p><span class="text-gray-500 text-xs">Paid On</span><br><span id="paidOn" class="font-semibold">—</span></p>
+        <p><span class="text-gray-500 text-xs">Method</span><br><span id="paidMethod" class="font-semibold">—</span></p>
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    // Helpers
-    const fmtUSD = n => '$' + (Number(n||0)).toFixed(2).replace(/\.00$/,'');
-    const todayISO = () => new Date().toISOString().slice(0,10);
+<!-- Controls (hidden on print) -->
+<div class="controls max-w-[720px] mx-auto px-3 mb-6 flex flex-wrap gap-3 items-center">
+  <label class="flex items-center gap-2"><input type="checkbox" id="paidToggle"> Mark as Paid</label>
+  <select id="methodSel" class="border rounded-xl px-3 py-2">
+    <option value="">Payment method…</option>
+    <option>Cash</option>
+    <option>Card</option>
+    <option>Cash App</option>
+    <option>Venmo</option>
+    <option>Zelle</option>
+    <option>Other</option>
+  </select>
+  <button onclick="window.print()" class="border rounded-xl px-3 py-2">Print / Download</button>
+  <button onclick="history.back()" class="border rounded-xl px-3 py-2">Back</button>
+</div>
 
-    // Simple sequential number (per-device/browser)
-    function nextReceiptSeq(){
-      try{const k='ASG_RECEIPT_SEQ';const c=parseInt(localStorage.getItem(k)||'0',10)||0;const n=c+1;localStorage.setItem(k,String(n));return n;}catch{return Math.floor(Math.random()*99999);}
+<script>
+(function(){
+  // Load payload from index.html handoff
+  let job;
+  try { job = JSON.parse(localStorage.getItem('ASG_RECEIPT') || '{}'); } catch { job = {}; }
+
+  // Fallbacks
+  const nowISO = new Date().toISOString();
+  const fmtDate = d => new Date(d).toLocaleDateString();
+  const $ = id => document.getElementById(id);
+
+  // Populate fields
+  $("cust").textContent  = job.customerName || '';
+  $("addr").textContent  = job.address || '';
+  $("mat").textContent   = job.material || '';
+  $("qty").textContent   = (job.quantity ?? '') + ' ' + (job.unit || '');
+  $("zone").textContent  = job.zone || '';
+  $("notes").textContent = job.notes || (job.paid ? 'Thank you!' : 'Payment due upon delivery unless noted.');
+  $("amount").textContent    = Number(job.unitPrice || 0).toFixed(2);
+  $("amountDue").textContent = Number(job.unitPrice || 0).toFixed(2);
+  $("invoiceDate").textContent = fmtDate(job.date || nowISO);
+  $("invoiceNo").textContent   = ('ASG-' + (job.customerName||'').replace(/\s+/g,'').slice(0,3).toUpperCase() + '-' + (job.date||nowISO).slice(2,10).replace(/-/g,''))
+
+  const badge = $("statusBadge");
+  const paidMeta = $("paidMeta");
+  const paidOn = $("paidOn");
+  const paidMethod = $("paidMethod");
+  const wrap = document.getElementById('wrap');
+  const toggle = $("paidToggle");
+  const methodSel = $("methodSel");
+  const amountLabel = $("amountLabel");
+
+  // Initialize state from job
+  job.paid = !!job.paid;
+  toggle.checked = job.paid;
+  if (job.method) methodSel.value = job.method;
+
+  function applyPaidUI(){
+    if (job.paid) {
+      badge.textContent = "PAID INVOICE";
+      badge.className = "badge badge-paid";
+      amountLabel.textContent = "Amount Paid";
+      paidMeta.classList.remove('hidden');
+      paidOn.textContent = fmtDate(job.paidOn || nowISO);
+      paidMethod.textContent = job.method || "Cash";
+      wrap.classList.add('paid-active');
+    } else {
+      badge.textContent = "INVOICE (DUE)";
+      badge.className = "badge badge-unpaid";
+      amountLabel.textContent = "Amount Due";
+      paidMeta.classList.add('hidden');
+      wrap.classList.remove('paid-active');
     }
-    function genReceiptNo(){ return 'ASG-'+String(nextReceiptSeq()).padStart(5,'0'); }
+  }
 
-    // Public API
-    window.ASGReceipt = {
-      show(job){
-        const m = normalize(job);
-        document.getElementById('receipt').innerHTML = render(m);
-      },
-      copyText(){
-        const text = document.getElementById('receipt').innerText.trim();
-        navigator.clipboard?.writeText(text).then(()=>alert('Copied.')).catch(()=>alert('Copy failed.'));
+  applyPaidUI();
+
+  // Persist back to localStorage jobs if possible
+  function persistBackToJobs() {
+    try {
+      const jobs = JSON.parse(localStorage.getItem('dt_jobs') || '[]');
+      // Try to find by matching (customer + date + address + price)
+      const idx = jobs.findIndex(j =>
+        (j.customer||'') === (job.customerName||'') &&
+        (j.address||'')  === (job.address||'') &&
+        (j.date||'')     === (job.date||'') &&
+        Number(j.price||0) === Number(job.unitPrice||0)
+      );
+      if (idx > -1) {
+        jobs[idx].paid = job.paid;
+        jobs[idx].paidMethod = job.method || '';
+        jobs[idx].paidOn = job.paid ? (jobs[idx].paidOn || new Date().toISOString()) : null;
+        localStorage.setItem('dt_jobs', JSON.stringify(jobs));
       }
-    };
+    } catch(e) {}
+  }
 
-    function normalize(j){
-      const m = j || {};
-      return {
-        docType: (m.docType==='invoice'?'invoice':'receipt'),
-        brand: { name:'Augusta Sand & Gravel', tagline:'Tight-access, driveway-safe deliveries', phone:'706-589-0657' },
-        receiptNo: m.receiptNo || genReceiptNo(),
-        date: m.date || todayISO(),
-        customerName: m.customerName || 'Customer',
-        phone: m.phone || '',
-        address: m.address || '',
-        material: m.material || 'Material',
-        quantity: Number(m.quantity||1),
-        unit: (m.unit==='yd'?'yd':'ton'),
-        zone: m.zone || 'Zone 1',
-        unitPrice: Number(m.unitPrice||0),
-        notes: m.notes || (m.docType==='invoice' ? 'Payment due upon delivery unless noted.' : 'Price includes delivery unless noted.'),
-        paid: Boolean(m.paid),
-        method: m.method || 'Cash'
-      };
+  // Events
+  toggle.addEventListener('change', ()=>{
+    job.paid = toggle.checked;
+    if (job.paid) {
+      job.paidOn = job.paidOn || new Date().toISOString();
+      job.method = methodSel.value || job.method || "Cash";
+    } else {
+      job.paidOn = null;
     }
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+    persistBackToJobs();
+    applyPaidUI();
+  });
 
-    function render(m){
-      const qtyLabel = `${m.quantity} ${m.unit}${m.quantity===1?'':'s'}`;
-      const badge = m.paid ? '<div class="badge">PAID</div>' : '<div class="badge due">DUE</div>';
-      return `
-        <div class="head">
-          <div class="brand">
-            <div class="logo">ASG</div>
-            <div>
-              <h1>${m.brand.name}</h1>
-              <p>${m.brand.tagline} • ${m.brand.phone}</p>
-            </div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-weight:800;margin-bottom:6px">${m.docType==='invoice'?'Invoice':'Receipt'}</div>
-            ${badge}
-          </div>
-        </div>
-
-        <div class="grid">
-          <div class="box">
-            <h3>${m.docType==='invoice'?'Invoice':'Receipt'} Info</h3>
-            <div class="row"><span class="k">Number</span><span class="v">${m.receiptNo}</span></div>
-            <div class="row"><span class="k">Date</span><span class="v">${m.date}</span></div>
-            <div class="row"><span class="k">Zone</span><span class="v">${m.zone}</span></div>
-            <div class="row"><span class="k">Payment</span><span class="v">${m.paid?'Paid':'Due'} (${m.method})</span></div>
-          </div>
-          <div class="box">
-            <h3>Customer</h3>
-            <div class="row"><span class="k">Name</span><span class="v">${m.customerName}</span></div>
-            ${m.phone?`<div class="row"><span class="k">Phone</span><span class="v">${m.phone}</span></div>`:''}
-            ${m.address?`<div class="row"><span class="k">Address</span><span class="v">${m.address}</span></div>`:''}
-          </div>
-        </div>
-
-        <table aria-label="Line items">
-          <thead><tr><th>Material</th><th>Quantity</th><th>Price</th><th class="right">Total</th></tr></thead>
-          <tbody>
-            <tr>
-              <td>${m.material}</td>
-              <td>${qtyLabel}</td>
-              <td>${fmtUSD(m.unitPrice)}</td>
-              <td class="right">${fmtUSD(m.unitPrice)}</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="3">${m.docType==='invoice'?'Amount Due':'Grand Total'}</td>
-              <td class="right">${fmtUSD(m.unitPrice)}</td>
-            </tr>
-          </tfoot>
-        </table>
-
-        <div class="note">${m.notes}</div>
-      `;
-    }
-  </script>
-
-  <!-- Loader: reads job data and renders -->
-  <script>
-    (function () {
-      try {
-        const raw = localStorage.getItem('ASG_RECEIPT');
-        const el = document.getElementById('receipt');
-        if (!raw) {
-          el.innerHTML = '<div style="color:#6b7280">No receipt data found. Go back and use “Receipt” or “Invoice”.</div>';
-          return;
-        }
-        const job = JSON.parse(raw);
-        ASGReceipt.show(job);
-        localStorage.removeItem('ASG_RECEIPT'); // optional cleanup
-      } catch (e) {
-        console.warn('Receipt load error:', e);
-        document.getElementById('receipt').innerHTML =
-          '<div style="color:#b91c1c">Error loading receipt. See console.</div>';
-      }
-    })();
-  </script>
+  methodSel.addEventListener('change', ()=>{
+    job.method = methodSel.value || '';
+    localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+    if (job.paid) paidMethod.textContent = job.method || '—';
+    persistBackToJobs();
+  });
+})();
+</script>
 </body>
 </html>
