@@ -12,8 +12,17 @@
   .badge-unpaid{background:#fef3c7;color:#92400e;border:1px solid #f59e0b}
   .badge-paid{background:#dcfce7;color:#166534;border:1px solid #22c55e}
   .muted{color:#6b7280;font-size:12px}
-  .paid-watermark{display:none;position:fixed;inset:0;pointer-events:none;opacity:0.12;font-size:140px;font-weight:900;color:#16a34a;transform:rotate(-20deg);display:flex;align-items:center;justify-content:center}
-  .paid-active .paid-watermark{display:flex}
+  /* Base: keep it hidden */
+.paid-watermark{
+  display:none;
+  position:fixed; inset:0; pointer-events:none; opacity:0.12;
+  font-size:140px; font-weight:900; color:#16a34a; transform:rotate(-20deg);
+  align-items:center; justify-content:center; /* flex props ready but hidden */
+}
+
+/* Show only when paid */
+.paid-active .paid-watermark{ display:flex; }
+
   @media print{ .controls{display:none!important}; body{background:#fff} .inv-card{border:none;box-shadow:none} }
 </style>
 </head>
