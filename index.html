@@ -1100,6 +1100,105 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   toggleCustomField();
 })();
 </script>
+<script>
+// === ASG Yard-vs-Ton Fix (Top Soil / Sand Clay) ===
+(function(){
+  const loadSel  = document.getElementById('loadSize');
+  const matSel   = document.getElementById('material');
+  const qtyLabel = document.getElementById('qtyLabel');
+  if (!loadSel || !matSel || !qtyLabel) return;
+
+  // Identify unit from master (if present) or by name fallback
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2'))
+          || null;
+    } catch { return null; }
+  }
+  function materialByLabel(master, label){
+    if (!master) return null;
+    const arr = Array.isArray(master.materials) ? master.materials
+              : (master.materials && typeof master.materials==='object' ? Object.values(master.materials) : []);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function unitFor(label){
+    const m = materialByLabel(readMaster(), label);
+    const u = (m?.unit || (/fill|top|sand|soil|clay/i.test(label||'') ? 'yard' : 'ton')).toLowerCase();
+    return (u === 'yard') ? 'yard' : 'ton';
+  }
+
+  // Keep a Total Tons field hidden for ton materials only (if present)
+  const customI = document.getElementById('customTons');
+
+  function rebuildQtyOptionsFor(materialLabel){
+    const unit = unitFor(materialLabel);
+    const master = readMaster();
+    const m = materialByLabel(master, materialLabel);
+    const zoneId = localStorage.getItem('HAULING_SELECTED_ZONE') || 'zone1';
+    const tiers = (m?.tiersByZone?.[zoneId]) || [];
+
+    const prev = loadSel.value;
+    loadSel.innerHTML = '<option value="">Qty</option>';
+
+    if (tiers.length) {
+      // Use master tiers
+      tiers.forEach(t=>{
+        const o = document.createElement('option');
+        o.value = String(t.qty);
+        o.textContent = `${t.qty} ${unit}${Number(t.qty)>1?'s':''}`;
+        loadSel.appendChild(o);
+      });
+    } else {
+      // Friendly fallback: 1–4 in the right unit if no tiers exist
+      [1,2,3,4].forEach(q=>{
+        const o = document.createElement('option');
+        o.value = String(q);
+        o.textContent = `${q} ${unit}${q>1?'s':''}`;
+        loadSel.appendChild(o);
+      });
+    }
+
+    // Only ton materials get Custom…
+    if (unit === 'ton') {
+      const o = document.createElement('option');
+      o.value = 'custom';
+      o.textContent = 'Custom…';
+      loadSel.appendChild(o);
+    }
+
+    // Update label to show unit
+    qtyLabel.textContent = `Load Size (${unit}${unit==='yard'?'s':''})`;
+
+    // Restore selection if possible
+    const hasPrev = Array.from(loadSel.options).some(o=>o.value===prev);
+    loadSel.value = hasPrev ? prev : '';
+
+    // Show/hide Total Tons input for ton materials only
+    if (customI) {
+      const show = unit === 'ton' && loadSel.value === 'custom';
+      customI.style.display = show ? '' : 'none';
+      if (!show) customI.value = '';
+    }
+  }
+
+  // Hook into your existing repopulate function (and initial render)
+  const origRepop = window.repopulateQtyOptions;
+  window.repopulateQtyOptions = function(){
+    if (typeof origRepop === 'function') origRepop();
+    rebuildQtyOptionsFor(matSel.options[matSel.selectedIndex]?.text?.trim() || matSel.value || '');
+  };
+
+  // Keep it fresh when material/qty changes
+  matSel.addEventListener('change', ()=> rebuildQtyOptionsFor(matSel.options[matSel.selectedIndex]?.text?.trim() || matSel.value || ''));
+  loadSel.addEventListener('change', ()=>{
+    if (customI) customI.style.display = (unitFor(matSel.value||'')==='ton' && loadSel.value==='custom') ? '' : 'none';
+  });
+
+  // First pass on load
+  rebuildQtyOptionsFor(matSel.options[matSel.selectedIndex]?.text?.trim() || matSel.value || '');
+})();
+</script>
 
 </body>
 </html>
