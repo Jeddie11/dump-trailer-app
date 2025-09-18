@@ -865,6 +865,159 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   }
 };
 </script>
+<script>
+// === ASG — Custom Total Tons (One-Paste) ===
+(function(){
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+  const MAX_TONS = 4;        // per trip cap
+  const ROUNDING = "ceil";   // bill up to the nearest ton bracket
+
+  // Grab core fields
+  const loadSizeI = document.getElementById('loadSize');
+  const materialI = document.getElementById('material');
+  const priceI    = document.getElementById('price');
+  if (!loadSizeI || !materialI || !priceI) return;
+
+  // 1) Ensure "Custom…" option exists
+  (function ensureCustomOption(){
+    const hasCustom = Array.from(loadSizeI.options).some(o => o.value === 'custom');
+    if (!hasCustom) {
+      const opt = document.createElement('option');
+      opt.value = 'custom'; opt.textContent = 'Custom…';
+      loadSizeI.appendChild(opt);
+    }
+  })();
+
+  // 2) Ensure a hidden "Total tons" input exists (right after Load Size)
+  let customI = document.getElementById('customTons');
+  if (!customI) {
+    customI = document.createElement('input');
+    customI.id = 'customTons';
+    customI.type = 'number';
+    customI.step = '0.1';
+    customI.min  = '0.5';
+    customI.placeholder = 'Total tons (e.g., 6.5)';
+    customI.className = 'rounded-xl border px-3 py-2';
+    customI.style.display = 'none';
+    loadSizeI.parentElement.after(customI);
+  }
+
+  // 3) Read master from localStorage (supports V3 or older V2)
+  function readMaster(){
+    try {
+      const v3 = localStorage.getItem('HAULING_MASTER_PRICING_V3');
+      if (v3) return JSON.parse(v3);
+      const v2 = localStorage.getItem('HAULING_MASTER_PRICING_V2');
+      if (v2) return JSON.parse(v2);
+    } catch {}
+    return null;
+  }
+  function materialByLabel(master, label){
+    if (!master) return null;
+    const arr = Array.isArray(master.materials) ? master.materials
+              : (master.materials && typeof master.materials === 'object' ? Object.values(master.materials) : []);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+
+  // 4) Pricing helpers for custom total tons
+  function splitTrips(total){
+    const trips = []; let rem = Math.max(0, Number(total)||0);
+    while (rem > 0){ const load = Math.min(MAX_TONS, rem); trips.push(load); rem = +(rem - load).toFixed(3); }
+    return trips;
+  }
+  function billable(load){
+    if (load <= 0) return 0;
+    if (load >= 4) return 4;
+    const r = (ROUNDING === 'nearest') ? Math.round(load) : Math.ceil(load);
+    return Math.min(Math.max(1, r), 4);
+  }
+  function tierPrice(matObj, zoneId, billedTons){
+    const tiers = matObj?.tiersByZone?.[zoneId] || [];
+    const match = tiers.find(t => Number(t.qty) === Number(billedTons));
+    if (!match) return null;
+    const base = Number(match.price || 0);
+    return matObj.minEnabled ? Math.max(base, Number(matObj.minimum||0)) : base;
+  }
+  function totalForCustom(master, matLabel, zoneId, totalTons){
+    const matObj = materialByLabel(master, matLabel);
+    if (!matObj) return NaN;
+    const trips = splitTrips(totalTons);
+    let total = 0;
+    for (const load of trips){
+      const billed = billable(load);
+      const p = tierPrice(matObj, zoneId, billed);
+      if (p == null || isNaN(p)) return NaN;
+      total += p;
+    }
+    return total;
+  }
+
+  // 5) UI wiring
+  function currentZoneId(){
+    return localStorage.getItem(ZONE_KEY) || 'zone1';
+  }
+  function currentMaterialLabel(){
+    return materialI?.value || materialI?.options[materialI.selectedIndex]?.text?.trim() || '';
+  }
+  function isTonMaterial(master, matLabel){
+    const m = materialByLabel(master, matLabel);
+    const unit = (m?.unit || (/fill|top|sand|soil/i.test(matLabel) ? 'yard' : 'ton')).toLowerCase();
+    return unit === 'ton';
+  }
+
+  function showHideCustom(){
+    const master = readMaster();
+    const matLabel = currentMaterialLabel();
+    const tonLike = isTonMaterial(master, matLabel);
+    const show = tonLike && loadSizeI.value === 'custom';
+    customI.style.display = show ? '' : 'none';
+    if (!show) customI.value = '';
+  }
+
+  function recalcPriceIfCustom(){
+    if (loadSizeI.value !== 'custom') return;
+    const totalTons = Number(customI.value || 0);
+    const matLabel  = currentMaterialLabel();
+    const zoneId    = currentZoneId();
+    if (!totalTons || totalTons <= 0){ return; }
+    const total = totalForCustom(readMaster(), matLabel, zoneId, totalTons);
+    if (Number.isFinite(total)) {
+      priceI.value = Math.round(total);            // set your total charge
+      priceI.dispatchEvent(new Event('input',{bubbles:true}));
+      priceI.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  }
+
+  loadSizeI.addEventListener('change', ()=>{ showHideCustom(); recalcPriceIfCustom(); });
+  materialI.addEventListener('change',    ()=>{ showHideCustom(); recalcPriceIfCustom(); });
+  customI.addEventListener('input',       ()=>{ recalcPriceIfCustom(); });
+
+  // Initial sync
+  showHideCustom();
+
+  // 6) Make Generate Receipt honor the custom total (qty + total)
+  // If your page already defined generateReceiptNow, wrap it.
+  if (typeof window.generateReceiptNow === 'function') {
+    const _orig = window.generateReceiptNow;
+    window.generateReceiptNow = function(){
+      // Ensure price is up-to-date for custom
+      recalcPriceIfCustom();
+
+      // If custom, set quantity to the entered total tons before original handler reads it
+      if (loadSizeI.value === 'custom') {
+        const totalTons = Number(customI.value || 0);
+        // Temporarily stash and replace to let the original function read correct qty if it uses loadSize
+        const prev = loadSizeI.value;
+        loadSizeI.value = String(totalTons || 1);   // so receipt shows total tons as quantity
+        try { return _orig.apply(this, arguments); }
+        finally { loadSizeI.value = prev; }         // restore selection
+      } else {
+        return _orig.apply(this, arguments);
+      }
+    };
+  }
+})();
+</script>
 
 </body>
 </html>
