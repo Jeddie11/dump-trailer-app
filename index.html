@@ -1018,6 +1018,88 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   }
 })();
 </script>
+<script>
+// === ASG Quick Patch: Keep "Custom…" working on material changes ===
+(function(){
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+  const loadSel  = document.getElementById('loadSize');
+  const matSel   = document.getElementById('material');
+  const priceI   = document.getElementById('price');
+  if (!loadSel || !matSel) return;
+
+  // 1) Ensure a "Total tons" input exists, right after the Load Size row
+  let customI = document.getElementById('customTons');
+  if (!customI) {
+    customI = document.createElement('input');
+    customI.id = 'customTons';
+    customI.type = 'number';
+    customI.step = '0.1';
+    customI.min  = '0.5';
+    customI.placeholder = 'Total tons (e.g., 6.5)';
+    customI.className = 'rounded-xl border px-3 py-2';
+    customI.style.display = 'none';
+    // place after the load size container
+    const loadWrap = loadSel.closest('div') || loadSel.parentElement;
+    loadWrap.parentElement.insertBefore(customI, loadWrap.nextSibling);
+  }
+
+  function unitFor(label){
+    return /fill|top|sand|soil/i.test(label||'') ? 'yard' : 'ton';
+  }
+  function currentMaterialLabel(){
+    return matSel?.value || matSel?.options[matSel.selectedIndex]?.text?.trim() || '';
+  }
+
+  // 2) Add/keep "Custom…" option for ton materials
+  function ensureCustomOption(){
+    const unit = unitFor(currentMaterialLabel());
+    // Only ton materials get "Custom…"
+    if (unit !== 'ton') {
+      removeCustomOption();
+      customI.style.display = 'none';
+      return;
+    }
+    const has = Array.from(loadSel.options).some(o => o.value === 'custom');
+    if (!has) {
+      const opt = document.createElement('option');
+      opt.value = 'custom';
+      opt.textContent = 'Custom…';
+      loadSel.appendChild(opt);
+    }
+  }
+  function removeCustomOption(){
+    Array.from(loadSel.options).forEach(o => { if (o.value === 'custom') o.remove(); });
+  }
+
+  // 3) Show/hide the Total tons field
+  function toggleCustomField(){
+    customI.style.display = (loadSel.value === 'custom') ? '' : 'none';
+    if (loadSel.value !== 'custom') customI.value = '';
+  }
+
+  // 4) Monkey-patch repopulateQtyOptions so Custom… survives rebuilds
+  const origRepop = window.repopulateQtyOptions;
+  window.repopulateQtyOptions = function(){
+    if (typeof origRepop === 'function') origRepop();
+    ensureCustomOption();
+    toggleCustomField();
+  };
+
+  // 5) Basic wiring
+  matSel.addEventListener('change', ()=>{ ensureCustomOption(); toggleCustomField(); });
+  loadSel.addEventListener('change', toggleCustomField);
+  customI.addEventListener('input', ()=> {
+    // Optional: if you want the price to refresh when typing custom tons,
+    // trigger your existing pricing hooks without changing your logic.
+    priceI?.dispatchEvent(new Event('input', {bubbles:true}));
+    priceI?.dispatchEvent(new Event('change', {bubbles:true}));
+  });
+
+  // Initial pass
+  ensureCustomOption();
+  toggleCustomField();
+})();
+</script>
 
 </body>
 </html>
