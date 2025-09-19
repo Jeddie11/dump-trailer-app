@@ -2021,6 +2021,86 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   if (typeof window.renderList === 'function') window.renderList();
 })();
 </script>
+<script>
+// === ASG: Show loads & total qty in Calendar day shelf ===
+(function(){
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2')) || null;
+    } catch { return null; }
+  }
+  function matsArr(m){ return !m ? [] : (Array.isArray(m.materials)?m.materials:(m.materials&&typeof m.materials==='object'?Object.values(m.materials):[])); }
+  function matByLabel(label){
+    const m = readMaster(), arr = matsArr(m);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function zoneId(){ return localStorage.getItem('HAULING_SELECTED_ZONE') || 'zone1'; }
+  function unitFor(label){
+    const mm = matByLabel(label);
+    const u  = (mm?.unit || (/fill|top|sand|soil|clay/i.test(label||'')?'yard':'ton')).toLowerCase();
+    return u==='yard'?'yard':'ton';
+  }
+  function tierPrice(label, qty){
+    const mm = matByLabel(label); if(!mm) return null;
+    const row = (mm.tiersByZone?.[zoneId()]||[]).find(t=>Number(t.qty)===Number(qty));
+    if(!row) return null;
+    const base = Number(row.price||0);
+    return mm.minEnabled ? Math.max(base, Number(mm.minimum||0)) : base;
+  }
+  function inferLoads(material, savedQty, total){
+    const p = {4:tierPrice(material,4),3:tierPrice(material,3),2:tierPrice(material,2),1:tierPrice(material,1)};
+    for (const q of [4,3,2,1]){
+      if (!Number.isFinite(p[q]) || p[q]<=0) continue;
+      const loads = Math.max(1, Math.round(total / p[q]));
+      const est = loads * p[q];
+      const tol = Math.max(10, 0.05*total);
+      if (Math.abs(total - est) <= tol) return {loads, per:q, totalQty: loads*q};
+    }
+    const qs = Number(savedQty||0)||1;
+    return {loads:1, per:qs, totalQty:qs};
+  }
+
+  function enhanceDayShelf(){
+    const wrap = document.getElementById('calDayJobs');
+    if (!wrap) return;
+    const cards = wrap.querySelectorAll('.rounded-xl.border'); // each job line card
+    (cards||[]).forEach(card=>{
+      // find job id from "Edit" link (data-edit-id)
+      const editBtn = card.querySelector('[data-edit-id]');
+      const id = editBtn?.getAttribute('data-edit-id');
+      const job = (window.jobs||[]).find(j=> String(j.id)===String(id));
+      if (!job) return;
+
+      const unit = unitFor(job.material||''); // 'ton' | 'yard'
+      const price = Number(job.price||0)||0;
+      const guessed = inferLoads(job.material||'', job.loadSize, price);
+      const unitLabel = unit + (guessed.totalQty>1?'s':'');
+
+      // Replace the small gray line (time • material • qty)
+      const gray = card.querySelector('.text-xs.text-gray-600');
+      if (!gray) return;
+      const time = (job.time||'').trim();
+      const left = [time, job.material||''].filter(Boolean).join(' • ');
+      const qtyTxt = `${guessed.totalQty} ${unitLabel}${guessed.loads>1?` (${guessed.loads} load${guessed.loads>1?'s':''} × ${guessed.per}${unit})`:''}`;
+      gray.textContent = left ? `${left} • ${qtyTxt}` : qtyTxt;
+    });
+  }
+
+  // Patch renderCal so our enhancer runs whenever calendar renders
+  const origRenderCal = window.renderCal;
+  if (typeof origRenderCal === 'function') {
+    window.renderCal = function(){ origRenderCal.apply(this, arguments); enhanceDayShelf(); };
+  }
+
+  // Also enhance immediately (for the currently open day)
+  enhanceDayShelf();
+
+  // Re-run when jobs change
+  const origSave = window.saveJobs || function(){};
+  window.saveJobs = function(){ origSave.apply(this, arguments); enhanceDayShelf(); };
+})();
+</script>
 
 </body>
 </html>
