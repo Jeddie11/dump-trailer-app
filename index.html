@@ -1323,6 +1323,149 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   }
 })();
 </script>
+<script>
+// === ASG: Multi-Loads for ALL Materials (one-paste) ===
+(function(){
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+  const loadSel  = document.getElementById('loadSize');
+  const matSel   = document.getElementById('material');
+  const priceI   = document.getElementById('price');
+  const autoNote = document.getElementById('autoNote');
+  if (!loadSel || !matSel || !priceI) return;
+
+  // 1) Add "# of loads" input once
+  let loadsI = document.getElementById('loadsCount');
+  if (!loadsI) {
+    loadsI = document.createElement('input');
+    loadsI.id = 'loadsCount';
+    loadsI.type = 'number';
+    loadsI.step = '1';
+    loadsI.min  = '1';
+    loadsI.value = '1';
+    loadsI.placeholder = 'Number of loads';
+    loadsI.className = 'rounded-xl border px-3 py-2';
+    loadsI.style.display = 'none';
+    const wrap = loadSel.closest('div') || loadSel.parentElement;
+    wrap.parentElement.insertBefore(loadsI, wrap.nextSibling);
+  }
+
+  // 2) Master helpers (works with V3/V2 in localStorage)
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2'))
+          || null;
+    } catch { return null; }
+  }
+  function materialByLabel(master, label){
+    if (!master) return null;
+    const arr = Array.isArray(master.materials) ? master.materials
+              : (master.materials && typeof master.materials==='object' ? Object.values(master.materials) : []);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function zoneId(){ return localStorage.getItem(ZONE_KEY) || 'zone1'; }
+  function matLabel(){
+    return matSel?.value || matSel?.options[matSel.selectedIndex]?.text?.trim() || '';
+  }
+  function unitFor(label){
+    const m = materialByLabel(readMaster(), label);
+    const u = (m?.unit || (/fill|top|sand|soil|clay/i.test(label||'') ? 'yard' : 'ton')).toLowerCase();
+    return (u === 'yard') ? 'yard' : 'ton';
+  }
+  function priceForQty(master, label, zId, qty){
+    const m = materialByLabel(master, label);
+    const tiers = m?.tiersByZone?.[zId] || [];
+    const row = tiers.find(t => Number(t.qty) === Number(qty));
+    if (!row) return null;
+    const base = Number(row.price || 0);
+    return m.minEnabled ? Math.max(base, Number(m.minimum||0)) : base;
+  }
+
+  // 3) Show/hide "# of loads" whenever a normal preset (1–4) is chosen
+  function isNumericPreset(){
+    return loadSel.value && loadSel.value !== 'custom' && !isNaN(Number(loadSel.value));
+  }
+  function toggleLoadsBox(){
+    // hide for blank or "Custom…" (we'll let "Custom" define the total itself)
+    const show = isNumericPreset();
+    loadsI.style.display = show ? '' : 'none';
+    if (!show) loadsI.value = '1';
+  }
+
+  // 4) Multiply price by number of loads for ANY material/unit
+  function adjustPriceForLoads(){
+    if (!isNumericPreset()) return;
+    const n = Math.max(1, parseInt(loadsI.value || '1', 10));
+    // If 1 load, let your existing updatePrice logic stand
+    if (n <= 1) return;
+
+    const master = readMaster();
+    const label  = matLabel();
+    const zId    = zoneId();
+    const qty    = Number(loadSel.value);
+    const perLoad = priceForQty(master, label, zId, qty);
+    if (perLoad == null) return;  // no tier for selected qty; keep current behavior
+
+    const total = perLoad * n;
+    priceI.value = String(Math.round(total));
+    priceI.dispatchEvent(new Event('input',  {bubbles:true}));
+    priceI.dispatchEvent(new Event('change', {bubbles:true}));
+    if (autoNote) {
+      const u = unitFor(label);
+      autoNote.textContent = `Master pricing: ${qty} ${u}${qty>1?'s':''} × ${n} load${n>1?'s':''} = $${Math.round(total)} (${zId==='zone2'?'Zone 2':'Zone 1'})`;
+    }
+  }
+
+  // 5) Keep behavior after the app rebuilds the menu or user changes zone/material
+  const origRepop = window.repopulateQtyOptions;
+  window.repopulateQtyOptions = function(){
+    if (typeof origRepop === 'function') origRepop();
+    // If material changed to yards/tons, your app already rebuilt options.
+    // We just re-show loads box for numeric presets and re-multiply price.
+    toggleLoadsBox();
+    // Run after any other price setters
+    setTimeout(adjustPriceForLoads, 0);
+  };
+
+  // If the zone FAB is used, re-multiply after it updates price
+  document.body.addEventListener('click', (e)=>{
+    if (e.target.closest('#zoneFab button[data-zone]')) {
+      setTimeout(()=>{ toggleLoadsBox(); adjustPriceForLoads(); }, 0);
+    }
+  });
+
+  // 6) Wire events
+  matSel.addEventListener('change', ()=>{ toggleLoadsBox(); setTimeout(adjustPriceForLoads,0); });
+  loadSel.addEventListener('change', ()=>{ toggleLoadsBox(); setTimeout(adjustPriceForLoads,0); });
+  loadsI.addEventListener('input', adjustPriceForLoads);
+
+  // Initial pass
+  toggleLoadsBox();
+
+  // 7) Make Generate Receipt use TOTAL quantity (qty × loads) + multiplied total
+  if (typeof window.generateReceiptNow === 'function') {
+    const _orig = window.generateReceiptNow;
+    window.generateReceiptNow = function(){
+      // ensure price reflects loads multiplier
+      adjustPriceForLoads();
+
+      if (isNumericPreset()) {
+        const n = Math.max(1, parseInt(loadsI.value || '1', 10));
+        if (n > 1) {
+          const prevVal = loadSel.value;
+          // Temporarily set the select to the TOTAL quantity so your existing
+          // receipt code reads the correct quantity (e.g., 3 loads × 2 = 6)
+          const totalQty = String(Number(prevVal) * n);
+          loadSel.value = totalQty;
+          try { return _orig.apply(this, arguments); }
+          finally { loadSel.value = prevVal; }
+        }
+      }
+      return _orig.apply(this, arguments);
+    };
+  }
+})();
+</script>
 
 </body>
 </html>
