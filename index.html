@@ -1466,6 +1466,40 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   }
 })();
 </script>
+<script>
+(function(){
+  const KEY='HAULING_MASTER_PRICING_V3';
+  const m = JSON.parse(localStorage.getItem(KEY) || '{}');
+  if (!m || !m.materials) return;
+
+  const arr = Array.isArray(m.materials) ? m.materials : Object.values(m.materials);
+  const byLabel = (s)=>arr.find(x => (x.label||'').toLowerCase() === s.toLowerCase());
+
+  const cr = byLabel('Crush & Run');
+  if (!cr || !cr.tiersByZone) { console.warn('Crusher Run tiers not found.'); return; }
+
+  function upsert(label, id, unit){
+    let item = byLabel(label);
+    if (!item) { item = { id, label, unit, minEnabled:true, minimum:100, tiersByZone:{} }; m.materials.push(item); }
+    item.unit = unit;
+    item.minEnabled = true;
+    item.minimum = 100;
+    item.tiersByZone = {
+      zone1: (cr.tiersByZone.zone1||[]).map(t=>({qty:Number(t.qty), price:Number(t.price)})),
+      zone2: (cr.tiersByZone.zone2||[]).map(t=>({qty:Number(t.qty), price:Number(t.price)}))
+    };
+  }
+
+  upsert('Sand Clay','sand_clay','ton');
+  upsert('Top Soil','top_soil','yard');
+
+  localStorage.setItem(KEY, JSON.stringify(m));
+
+  // Refresh UI
+  if (typeof window.repopulateQtyOptions === 'function') repopulateQtyOptions();
+  document.getElementById('material')?.dispatchEvent(new Event('change', {bubbles:true}));
+})();
+</script>
 
 </body>
 </html>
