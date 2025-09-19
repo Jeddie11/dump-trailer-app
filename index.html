@@ -1791,6 +1791,141 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   };
 })();
 </script>
+<script>
+// === ASG: Smart single-material receipt (infers total qty & loads) ===
+(function(){
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+
+  // --- Master helpers (works with V3 or V2 in localStorage) ---
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2'))
+          || null;
+    } catch { return null; }
+  }
+  function materialsArray(m){
+    if (!m) return [];
+    return Array.isArray(m.materials) ? m.materials
+         : (m.materials && typeof m.materials==='object' ? Object.values(m.materials) : []);
+  }
+  function matByLabel(label){
+    const m = readMaster();
+    const arr = materialsArray(m);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function unitFor(label){
+    const mm = matByLabel(label);
+    if (mm && mm.unit) return (mm.unit.toLowerCase()==='yard') ? 'yd' : 'ton';
+    // fallback by name if master missing unit
+    return /fill|top\s*soil/i.test(label||'') ? 'yd' : 'ton';
+  }
+  function zoneId(){ return localStorage.getItem(ZONE_KEY) || 'zone1'; }
+  function tierPrice(label, qty){
+    const mm = matByLabel(label); if(!mm) return null;
+    const tiers = (mm.tiersByZone?.[zoneId()]) || [];
+    const row = tiers.find(t => Number(t.qty)===Number(qty));
+    if (!row) return null;
+    const base = Number(row.price||0);
+    return mm.minEnabled ? Math.max(base, Number(mm.minimum||0)) : base;
+  }
+
+  // Infer total quantity and number of loads from the line total & tiers
+  function inferTotals(materialLabel, savedQty, lineTotal, u){
+    const qSaved = Number(savedQty||0) || 0;
+    const p1 = tierPrice(materialLabel,1);
+    const p2 = tierPrice(materialLabel,2);
+    const p3 = tierPrice(materialLabel,3);
+    const p4 = tierPrice(materialLabel,4);
+
+    // try 4-, then 3-, 2-, 1- unit loads
+    const candidates = [{q:4,p:p4},{q:3,p:p3},{q:2,p:p2},{q:1,p:p1}]
+      .filter(v=>Number.isFinite(v.p)&&v.p>0);
+
+    for (const c of candidates){
+      const k = Math.max(1, Math.round(lineTotal / c.p));       // estimated loads
+      const est = k * c.p;
+      const tol = Math.max(10, 0.05 * lineTotal);               // $10 or 5%
+      if (Math.abs(lineTotal - est) <= tol){
+        return { loads:k, perLoadQty:c.q, totalQty:k*c.q };
+      }
+    }
+
+    // Fallbacks:
+    // If user used Custom tons box, honor it
+    const custom = document.getElementById('customTons');
+    if (custom && (document.getElementById('loadSize')?.value==='custom')) {
+      const total = Number(custom.value||0) || (qSaved||1);
+      return { loads: u==='ton' ? Math.max(1, Math.ceil(total/4)) : 1, perLoadQty: u==='ton'?4:qSaved||1, totalQty: total };
+    }
+
+    // Otherwise just use saved qty (whatever was selected)
+    return { loads:1, perLoadQty:qSaved||1, totalQty:qSaved||1 };
+  }
+
+  // --- Replacement for generateReceiptNow (more accurate qty/loads) ---
+  window.generateReceiptNow = function(){
+    try {
+      // DOM
+      const dateI     = document.getElementById('date');
+      const timeI     = document.getElementById('time');
+      const customerI = document.getElementById('customer');
+      const addressI  = document.getElementById('address');
+      const materialI = document.getElementById('material');
+      const loadSizeI = document.getElementById('loadSize');
+      const priceI    = document.getElementById('price');
+
+      // Required
+      const customer = (customerI?.value||'').trim();
+      const address  = (addressI?.value||'').trim();
+      const matLabel = materialI?.value || materialI?.options[materialI.selectedIndex]?.text?.trim() || '';
+      const total    = Number(priceI?.value||0);
+
+      if (!customer || !address || !matLabel || !total) {
+        alert('Need Customer, Address, Material, and Price before generating a receipt.');
+        return;
+      }
+
+      // Zone label
+      const zId = zoneId();
+      const zoneLabel = (zId === 'zone2') ? 'Zone 2' : 'Zone 1';
+
+      // Unit & totals
+      const unit = unitFor(matLabel); // 'ton' or 'yd'
+      const savedQty = loadSizeI?.value || '';
+      const totals = inferTotals(matLabel, savedQty, total, unit);
+
+      // Build doc
+      const todayStr = () => new Date().toISOString().slice(0,10);
+      const job = {
+        customerName: customer,
+        phone: '',
+        address,
+        date: (dateI?.value || todayStr()),
+        material: matLabel,
+        quantity: totals.totalQty,             // ← correct total tons/yards
+        unit: unit,
+        zone: zoneLabel,
+        unitPrice: total,                      // your summed line total
+        notes: (totals.loads>1 ? `${totals.loads} load${totals.loads>1?'s':''} × ${totals.perLoadQty}${unit}` : ''),
+        paid: true,
+        method: 'Cash'
+      };
+
+      localStorage.setItem('ASG_RECEIPT', JSON.stringify(job));
+
+      // Navigate (robust path)
+      const here = location.pathname;
+      const basePath = here.endsWith('/') ? here : here.replace(/[^/]+$/, '');
+      const url = location.origin + basePath + 'receipt.html?v=' + Date.now();
+      window.location.assign(url);
+    } catch (e) {
+      console.error('Generate receipt failed:', e);
+      alert('Generate receipt failed. Check Console for details.');
+    }
+  };
+})();
+</script>
 
 </body>
 </html>
