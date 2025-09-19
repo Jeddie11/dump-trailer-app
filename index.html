@@ -1199,6 +1199,130 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   rebuildQtyOptionsFor(matSel.options[matSel.selectedIndex]?.text?.trim() || matSel.value || '');
 })();
 </script>
+<script>
+// === ASG: Multi 4-Ton Loads (one paste) ===
+(function(){
+  const ZONE_KEY = "HAULING_SELECTED_ZONE";
+  const loadSel  = document.getElementById('loadSize');
+  const matSel   = document.getElementById('material');
+  const priceI   = document.getElementById('price');
+  const autoNote = document.getElementById('autoNote');
+  if (!loadSel || !matSel || !priceI) return;
+
+  // ---- add the "# of loads (×4t)" input right after load size row ----
+  let loadsI = document.getElementById('loadsCount');
+  if (!loadsI) {
+    loadsI = document.createElement('input');
+    loadsI.id = 'loadsCount';
+    loadsI.type = 'number';
+    loadsI.step = '1';
+    loadsI.min  = '1';
+    loadsI.value = '1';
+    loadsI.placeholder = 'Number of loads (×4t)';
+    loadsI.className = 'rounded-xl border px-3 py-2';
+    loadsI.style.display = 'none';
+    const wrap = loadSel.closest('div') || loadSel.parentElement;
+    wrap.parentElement.insertBefore(loadsI, wrap.nextSibling);
+  }
+
+  // ---- helpers (use your existing master schema in localStorage) ----
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2'))
+          || null;
+    } catch { return null; }
+  }
+  function materialByLabel(master, label){
+    if (!master) return null;
+    const arr = Array.isArray(master.materials) ? master.materials
+              : (master.materials && typeof master.materials==='object' ? Object.values(master.materials) : []);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function zoneId(){ return localStorage.getItem(ZONE_KEY) || 'zone1'; }
+  function currentMatLabel(){
+    return matSel?.value || matSel?.options[matSel.selectedIndex]?.text?.trim() || '';
+  }
+  function unitFor(label){
+    const m = materialByLabel(readMaster(), label);
+    const u = (m?.unit || (/fill|top|sand|soil|clay/i.test(label||'') ? 'yard' : 'ton')).toLowerCase();
+    return (u === 'yard') ? 'yard' : 'ton';
+  }
+  function priceForQty4(master, matLabel, zId){
+    const m = materialByLabel(master, matLabel);
+    const tiers = m?.tiersByZone?.[zId] || [];
+    const row = tiers.find(t => Number(t.qty) === 4);
+    if (!row) return null;
+    const base = Number(row.price||0);
+    return m.minEnabled ? Math.max(base, Number(m.minimum||0)) : base;
+  }
+
+  // ---- show/hide the loads input only when "4" is selected on ton materials ----
+  function toggleLoadsBox(){
+    const isTon = unitFor(currentMatLabel()) === 'ton';
+    const show  = isTon && loadSel.value === '4';
+    loadsI.style.display = show ? '' : 'none';
+    if (!show) loadsI.value = '1';
+  }
+
+  // ---- adjust price & note when using multiple 4-ton loads ----
+  function adjustPriceForLoads(){
+    // only when "4" is selected and loads > 1
+    if (loadSel.value !== '4') return;
+    const n = Math.max(1, parseInt(loadsI.value||'1',10));
+    if (n <= 1) return; // single 4-ton load: let your existing logic stand
+
+    const m = readMaster();
+    const base = priceForQty4(m, currentMatLabel(), zoneId());
+    if (base == null) return; // no master price for 4t; keep existing behavior
+
+    const total = base * n;
+    priceI.value = String(Math.round(total));
+    priceI.dispatchEvent(new Event('input', {bubbles:true}));
+    priceI.dispatchEvent(new Event('change', {bubbles:true}));
+    if (autoNote) {
+      autoNote.textContent = `Master pricing: 4t × ${n} loads = $${Math.round(total)} (zone ${zoneId()==='zone2'?'2':'1'})`;
+    }
+  }
+
+  // ---- patch repopulateQtyOptions so the loads box survives menu rebuilds ----
+  const origRepop = window.repopulateQtyOptions;
+  window.repopulateQtyOptions = function(){
+    if (typeof origRepop === 'function') origRepop();
+    toggleLoadsBox();
+  };
+
+  // ---- event wiring ----
+  matSel.addEventListener('change', ()=>{ toggleLoadsBox(); adjustPriceForLoads(); });
+  loadSel.addEventListener('change', ()=>{ toggleLoadsBox(); adjustPriceForLoads(); });
+  loadsI.addEventListener('input', ()=>{ adjustPriceForLoads(); });
+
+  // initial
+  toggleLoadsBox();
+
+  // ---- make Generate Receipt use total tons & total price when multi-loads ----
+  if (typeof window.generateReceiptNow === 'function') {
+    const _orig = window.generateReceiptNow;
+    window.generateReceiptNow = function(){
+      // ensure price is correct if user just changed loads
+      adjustPriceForLoads();
+
+      if (loadSel.value === '4') {
+        const n = Math.max(1, parseInt(loadsI.value||'1',10));
+        if (n > 1) {
+          // temporarily set the select's value to the total tons so the
+          // existing receipt logic picks up the right quantity
+          const prev = loadSel.value;
+          loadSel.value = String(4 * n);
+          try { return _orig.apply(this, arguments); }
+          finally { loadSel.value = prev; }
+        }
+      }
+      return _orig.apply(this, arguments);
+    };
+  }
+})();
+</script>
 
 </body>
 </html>
