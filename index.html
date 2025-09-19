@@ -1926,6 +1926,101 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   };
 })();
 </script>
+<script>
+// === ASG: Show loads & total qty on Jobs list (non-destructive) ===
+(function(){
+  // --- helpers to read master + figure units & tier prices ---
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2'))
+          || null;
+    } catch { return null; }
+  }
+  function matsArr(m){
+    if (!m) return [];
+    return Array.isArray(m.materials) ? m.materials
+         : (m.materials && typeof m.materials==='object' ? Object.values(m.materials) : []);
+  }
+  function matByLabel(label){
+    const m = readMaster(); const arr = matsArr(m);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function zoneId(){ return localStorage.getItem('HAULING_SELECTED_ZONE') || 'zone1'; }
+  function unitFor(label){
+    const mm = matByLabel(label);
+    const u = (mm?.unit || (/fill|top|sand|soil|clay/i.test(label||'') ? 'yard' : 'ton')).toLowerCase();
+    return u === 'yard' ? 'yard' : 'ton';
+  }
+  function tierPrice(label, qty){
+    const mm = matByLabel(label); if(!mm) return null;
+    const row = (mm.tiersByZone?.[zoneId()] || []).find(t => Number(t.qty) === Number(qty));
+    if (!row) return null;
+    const base = Number(row.price||0);
+    return mm.minEnabled ? Math.max(base, Number(mm.minimum||0)) : base;
+  }
+  // infer loads & totals from a job's price using 4/3/2/1 tiers
+  function inferLoads(material, savedQty, lineTotal){
+    const p = {
+      4: tierPrice(material,4),
+      3: tierPrice(material,3),
+      2: tierPrice(material,2),
+      1: tierPrice(material,1)
+    };
+    const candidates = [4,3,2,1].filter(q => Number.isFinite(p[q]) && p[q]>0);
+    for (const q of candidates){
+      const loads = Math.max(1, Math.round(lineTotal / p[q]));
+      const est   = loads * p[q];
+      const tol   = Math.max(10, 0.05 * lineTotal); // $10 or 5%
+      if (Math.abs(lineTotal - est) <= tol){
+        return { loads, perLoadQty:q, totalQty: loads*q };
+      }
+    }
+    // fallback – use saved qty if present
+    const qSaved = Number(savedQty||0) || 0;
+    return { loads:1, perLoadQty:qSaved||1, totalQty:qSaved||1 };
+  }
+
+  // --- wrap your renderList to add the loads text on each card ---
+  const origRender = window.renderList || function(){};
+  window.renderList = function(){
+    origRender();
+    try{
+      const list = document.getElementById('list');
+      if (!list) return;
+      const cards = list.querySelectorAll('[data-id]');
+      (cards||[]).forEach(card=>{
+        const id = card.getAttribute('data-id');
+        const job = (window.jobs||[]).find(j=> String(j.id) === String(id));
+        if (!job) return;
+
+        const unit = unitFor(job.material||'');     // 'ton' | 'yard'
+        const metaEl = card.querySelector('.text-xs.text-gray-600');
+        if (!metaEl) return;
+
+        const price = Number(job.price||0) || 0;
+        const inf = inferLoads(job.material||'', job.loadSize, price);
+        const unitLabel = unit + (inf.totalQty>1 ? 's' : '');
+
+        // Build meta line: Material • TOTAL QTY (loads × per-load) • $total
+        const parts = [];
+        if (job.material) parts.push(job.material);
+        if (inf.totalQty) {
+          parts.push(`${inf.totalQty} ${unitLabel}${inf.loads>1 ? ` (${inf.loads} load${inf.loads>1?'s':''} × ${inf.perLoadQty}${unit})` : ''}`);
+        } else if (job.loadSize) {
+          // fallback to original saved qty
+          parts.push(`${job.loadSize} ${unit}${Number(job.loadSize)>1?'s':''}`);
+        }
+        if (price) parts.push(`$${price}`);
+        metaEl.textContent = parts.join(' • ');
+      });
+    } catch(e){ console.warn('enhanced renderList failed:', e); }
+  };
+
+  // run once now so the list updates immediately
+  if (typeof window.renderList === 'function') window.renderList();
+})();
+</script>
 
 </body>
 </html>
