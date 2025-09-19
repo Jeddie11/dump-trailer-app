@@ -1500,6 +1500,51 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   document.getElementById('material')?.dispatchEvent(new Event('change', {bubbles:true}));
 })();
 </script>
+<script>
+// Copy Crush & Run tiers to Sand Clay (ton) and Top Soil (yard)
+(function(){
+  const KEY = 'HAULING_MASTER_PRICING_V3';
+  let m; try { m = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { m = {}; }
+  if (!m || !m.materials) return;
+
+  // Normalize materials to array for editing
+  const mats = Array.isArray(m.materials) ? m.materials : Object.values(m.materials);
+  const byLabel = s => mats.find(x => (x.label||'').toLowerCase() === s.toLowerCase());
+  const byId    = s => mats.find(x => (x.id||'').toLowerCase()    === s.toLowerCase());
+
+  const crusher = byLabel('Crush & Run') || byId('crush_and_run');
+  if (!crusher || !crusher.tiersByZone) { console.warn('Crusher Run tiers not found.'); return; }
+
+  function upsertLikeCrusher(label, id, unit){
+    let item = byLabel(label) || byId(id);
+    if (!item) { item = { id, label, unit, minEnabled:true, minimum:100, tiersByZone:{} }; mats.push(item); }
+    item.unit = unit;
+    item.minEnabled = true;
+    item.minimum = 100;
+    item.tiersByZone = {
+      zone1: (crusher.tiersByZone.zone1||[]).map(t=>({ qty:Number(t.qty), price:Number(t.price) })),
+      zone2: (crusher.tiersByZone.zone2||[]).map(t=>({ qty:Number(t.qty), price:Number(t.price) })),
+    };
+  }
+
+  upsertLikeCrusher('Sand Clay','sand_clay','ton');
+  upsertLikeCrusher('Top Soil','top_soil','yard');
+
+  // Write back preserving original shape
+  if (Array.isArray(m.materials)) m.materials = mats;
+  else {
+    const obj = {};
+    mats.forEach(x => { obj[x.id || (x.label||'').toLowerCase().replace(/\W+/g,'_')] = x; });
+    m.materials = obj;
+  }
+  localStorage.setItem(KEY, JSON.stringify(m));
+
+  // Refresh UI/pricing
+  document.getElementById('material')?.dispatchEvent(new Event('change', {bubbles:true}));
+  if (typeof window.repopulateQtyOptions === 'function') repopulateQtyOptions();
+  document.getElementById('loadSize')?.dispatchEvent(new Event('change', {bubbles:true}));
+})();
+</script>
 
 </body>
 </html>
