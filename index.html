@@ -1591,6 +1591,206 @@ window.generateDocFromJob = function (jobId, type /* 'invoice' | 'receipt' */) {
   document.getElementById('loadSize')?.dispatchEvent(new Event('change', {bubbles:true}));
 })();
 </script>
+<script>
+// === ASG: Combined Receipt (auto-detect loads & total qty) ===
+(function(){
+  const addAfter = document.getElementById('generateReceiptBtn')?.parentElement;
+  if (!addAfter) return;
+
+  // If a previous button exists, remove it to avoid duplicates
+  document.getElementById('combinedReceiptBtn')?.remove();
+
+  const btn = document.createElement('button');
+  btn.id = 'combinedReceiptBtn';
+  btn.type = 'button';
+  btn.className = 'rounded-xl px-4 py-2 border';
+  btn.textContent = 'Combined Receipt';
+  addAfter.insertBefore(btn, addAfter.firstChild);
+
+  // ---- Master helpers ----
+  function readMaster(){
+    try {
+      return JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V3'))
+          || JSON.parse(localStorage.getItem('HAULING_MASTER_PRICING_V2'))
+          || null;
+    } catch { return null; }
+  }
+  function materialByLabel(m, label){
+    if (!m) return null;
+    const arr = Array.isArray(m.materials) ? m.materials
+            : (m.materials && typeof m.materials==='object' ? Object.values(m.materials) : []);
+    return arr.find(x => (x.label||'').toLowerCase() === (label||'').toLowerCase()) || null;
+  }
+  function unitFor(label){
+    const m = materialByLabel(readMaster(), label);
+    const u = (m?.unit || (/fill|top|sand|soil|clay/i.test(label||'') ? 'yard' : 'ton')).toLowerCase();
+    return (u === 'yard') ? 'yd' : 'ton';
+  }
+  function zoneId(){ return (localStorage.getItem('HAULING_SELECTED_ZONE') || 'zone1'); }
+  function tierPrice(label, qty){
+    const m = readMaster();
+    const mat = materialByLabel(m, label);
+    const z = zoneId();
+    const row = mat?.tiersByZone?.[z]?.find(t => Number(t.qty) === Number(qty));
+    if (!row) return null;
+    const base = Number(row.price || 0);
+    return mat.minEnabled ? Math.max(base, Number(mat.minimum||0)) : base;
+  }
+
+  // Try to infer total quantity & loads from price and tier prices.
+  // Returns {totalQty, perLoadQty, loads} or falls back to saved qty.
+  function inferTotals(material, savedQty, lineTotal){
+    const qSaved = Number(savedQty || 0) || 0;
+    const unit = unitFor(material);
+    const p1 = tierPrice(material, 1);
+    const p2 = tierPrice(material, 2);
+    const p3 = tierPrice(material, 3);
+    const p4 = tierPrice(material, 4);
+
+    // Candidates we test (prefer 4-unit loads first, then 3,2,1)
+    const candidates = [
+      {q:4, p:p4}, {q:3, p:p3}, {q:2, p:p2}, {q:1, p:p1}
+    ].filter(x => Number.isFinite(x.p) && x.p > 0);
+
+    let best = null;
+    for (const c of candidates){
+      const k = Math.max(1, Math.round(lineTotal / c.p)); // number of loads (integer)
+      const est = k * c.p;
+      // tolerance: $10 or 5%, whichever is larger
+      const tol = Math.max(10, 0.05 * lineTotal);
+      const miss = Math.abs(lineTotal - est);
+      if (miss <= tol){
+        best = {loads: k, perLoadQty: c.q, totalQty: k * c.q, miss};
+        break;
+      }
+    }
+
+    if (best) return best;
+
+    // Fallback: use saved qty (what dispatcher picked), at least nonzero
+    return {
+      loads: 1,
+      perLoadQty: qSaved || 1,
+      totalQty: qSaved || 1
+    };
+  }
+
+  function fmtMoney(n){ return isFinite(n) ? '$' + Math.round(n) : '—'; }
+
+  btn.onclick = function(){
+    try{
+      const dateI = document.getElementById('date');
+      const custI = document.getElementById('customer');
+      const date = (dateI?.value || new Date().toISOString().slice(0,10)).trim();
+      const customer = (custI?.value || '').trim();
+      if (!customer) { alert('Enter Customer name first.'); return; }
+
+      const same = (a,b)=> (a||'').trim().toLowerCase() === (b||'').trim().toLowerCase();
+      const itemsSrc = (window.jobs||[]).filter(j => j && j.date === date && same(j.customer, customer) && j.status !== 'Canceled');
+      if (!itemsSrc.length){ alert('No jobs found for that customer & date.'); return; }
+
+      // Enrich each line: infer totals
+      const zLabel = (zoneId() === 'zone2') ? 'Zone 2' : 'Zone 1';
+      const items = itemsSrc.map(j => {
+        const mat = j.material || '';
+        const unit = unitFor(mat);
+        const price = Number(j.price || 0) || 0;
+        const savedQty = Number(j.loadSize || 0) || 0;
+        const inf = inferTotals(mat, savedQty, price);
+        return {
+          material: mat,
+          totalQty: inf.totalQty,
+          perLoadQty: inf.perLoadQty,
+          loads: inf.loads,
+          unit,
+          zone: zLabel,
+          price,
+          address: j.address || ''
+        };
+      });
+
+      const total = items.reduce((s,it)=> s + (Number(it.price)||0), 0);
+      const addr = items.find(i=>i.address)?.address || (document.getElementById('address')?.value || '');
+
+      // Build print page
+      const now = new Date();
+      const id = 'ASG-' + now.getFullYear().toString().slice(2)
+               + String(now.getMonth()+1).padStart(2,'0')
+               + String(now.getDate()).padStart(2,'0')
+               + '-' + Math.random().toString(36).slice(2,7).toUpperCase();
+
+      const rows = items.map((it,i)=>`
+        <tr>
+          <td>${i+1}</td>
+          <td>${it.material}</td>
+          <td>${it.totalQty} ${it.unit} <span style="color:#6b7280">(${it.loads} load${it.loads>1?'s':''} × ${it.perLoadQty}${it.unit})</span></td>
+          <td>${it.zone}</td>
+          <td class="right">${fmtMoney(it.price)}</td>
+        </tr>`).join('');
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+        <title>ASG Combined Receipt ${id}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          :root{--ink:#0b0b0c;--muted:#6b7280;--border:#e5e7eb}
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);margin:24px}
+          h1{font-size:20px;margin:0 0 4px}
+          .muted{color:var(--muted)}
+          .card{border:1px solid var(--border);border-radius:12px;padding:16px;margin:12px 0}
+          table{width:100%;border-collapse:collapse}
+          th,td{padding:8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
+          .right{text-align:right}
+          .total{font-weight:700}
+          @media print{.noprint{display:none}}
+        </style></head><body>
+        <div style="display:flex;justify-content:space-between;gap:16px">
+          <div>
+            <h1>Augusta Sand & Gravel</h1>
+            <div class="muted">Call/Text: 706.589.0657</div>
+          </div>
+          <div style="text-align:right">
+            <div><strong>Receipt</strong></div>
+            <div class="muted">${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+            <div class="muted">ID: ${id}</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div><strong>Bill To:</strong> ${customer}</div>
+          <div>${addr || ''}</div>
+          <div class="muted">Date: ${date}</div>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead><tr><th>#</th><th>Material</th><th>Qty (total)</th><th>Zone</th><th class="right">Line Total</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot>
+              <tr><td colspan="4" class="right total">Total</td><td class="right total">${fmtMoney(total)}</td></tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="card">
+          <div style="height:56px;display:flex;align-items:end;gap:16px">
+            <div style="border-top:1px solid var(--border);flex:1"></div>Signature
+            <div style="border-top:1px solid var(--border);width:220px"></div>
+          </div>
+        </div>
+
+        <div class="noprint" style="margin-top:12px">
+          <button onclick="window.print()" style="padding:10px 14px;border:1px solid #111827;border-radius:10px;background:#111827;color:#fff;cursor:pointer">Print / Save PDF</button>
+        </div>
+      </body></html>`;
+
+      const w = window.open('', '_blank'); w.document.write(html); w.document.close();
+    } catch(e){
+      console.error(e);
+      alert('Could not generate combined receipt.');
+    }
+  };
+})();
+</script>
 
 </body>
 </html>
