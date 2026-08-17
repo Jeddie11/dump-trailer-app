@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="./icons/asg-icon-192.png" />
+<link rel="apple-touch-icon" href="./icons/asg-icon-192.png" />
+<title>Augusta Sand & Gravel</title>
+<style>html,body{margin:0;background:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:14px}</style>
+</head>
+<body>
+<div class="loading">Loading ASG…</div>
+<script>
+(async function(){
+  try {
+    const res = await fetch('./index.html?v=' + Date.now(), {cache:'no-store'});
+    if (!res.ok) throw new Error('Could not load tracker');
+    let html = await res.text();
+
+    const oldAdmin = '<a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">Open Admin / Pricing</a>';
+    const newAdmin = '<div class="flex flex-wrap gap-2">' +
+      '<a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">Open Admin / Pricing</a>' +
+      '<a href="./finance-app.html" class="inline-block bg-black text-[var(--brand-yellow)] font-semibold px-4 py-2 rounded-xl border border-black">Profit / Taxes</a>' +
+      '</div>';
+
+    if (html.includes(oldAdmin)) {
+      html = html.replace(oldAdmin, newAdmin);
+    } else {
+      html = html.replace('</header>', '</header><div style="max-width:36rem;margin:0 auto;padding:0 12px 8px"><a href="./finance-app.html" style="display:inline-block;background:#000;color:#FACC15;font-weight:700;padding:10px 14px;border-radius:12px;text-decoration:none">Profit / Taxes</a></div>');
+    }
+
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    document.body.innerHTML = '<div style="padding:24px;font-family:system-ui"><b>ASG could not load.</b><div style="margin-top:8px">Refresh the page and try again.</div></div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
