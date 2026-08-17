@@ -14,18 +14,7 @@
   try{
     const res=await fetch('./quote-profit.html?v='+Date.now(),{cache:'no-store'});
     if(!res.ok) throw new Error('Could not load quote calculator');
-    let html=await res.text();
-
-    html=html.replace(
-      'const BASE_PRESETS={',
-      "const BASE_PRESETS={'Sample & Son|#57 Stone':{cost:29.75,basis:'ton',note:'Cash all-in: $29.00 base + $0.75/ton state fee. Older card receipts also show about a 4% card surcharge.'},'Sample & Son|Crush & Run':{cost:23.75,basis:'ton',note:'Cash all-in estimate: $23.00 base + $0.75/ton state fee. Older card receipts also show about a 4% card surcharge.'},"
-    );
-
-    html=html.replace(
-      'Two current prices are preloaded: Thomson #57 at $43.06/ton including tax, and BP Hauling fill dirt at $100/load. Other supplier/material prices stay blank until you save them.',
-      'Built-in supplier prices: Thomson #57 at $43.06/ton including tax; Sample & Son #57 at $29.75/ton cash all-in ($29 base + $0.75/ton state fee); Sample & Son Crusher Run at $23.75/ton cash all-in estimate ($23 base + $0.75/ton state fee); and BP Hauling fill dirt at $100/load. Older Sample receipts show about a 4% card surcharge on top when paying by card. Other supplier/material prices stay blank until you save them.'
-    );
-
+    const html=await res.text();
     document.open();
     document.write(html);
     document.close();
