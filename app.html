@@ -23,13 +23,14 @@
     const oldAdmin = '<a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">Open Admin / Pricing</a>';
     const newAdmin = '<div class="flex flex-wrap gap-2">' +
       '<a href="./admin.html" class="inline-block bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl border border-blue-600">Open Admin / Pricing</a>' +
+      '<a href="./quote-profit.html" class="inline-block bg-[var(--brand-yellow)] text-black font-semibold px-4 py-2 rounded-xl border border-yellow-500">Quote / Profit</a>' +
       '<a href="./finance-app.html" class="inline-block bg-black text-[var(--brand-yellow)] font-semibold px-4 py-2 rounded-xl border border-black">Profit / Taxes</a>' +
       '</div>';
 
     if (html.includes(oldAdmin)) {
       html = html.replace(oldAdmin, newAdmin);
     } else {
-      html = html.replace('</header>', '</header><div style="max-width:36rem;margin:0 auto;padding:0 12px 8px"><a href="./finance-app.html" style="display:inline-block;background:#000;color:#FACC15;font-weight:700;padding:10px 14px;border-radius:12px;text-decoration:none">Profit / Taxes</a></div>');
+      html = html.replace('</header>', '</header><div style="max-width:36rem;margin:0 auto;padding:0 12px 8px;display:flex;gap:8px;flex-wrap:wrap"><a href="./quote-profit.html" style="display:inline-block;background:#FACC15;color:#000;font-weight:700;padding:10px 14px;border-radius:12px;text-decoration:none">Quote / Profit</a><a href="./finance-app.html" style="display:inline-block;background:#000;color:#FACC15;font-weight:700;padding:10px 14px;border-radius:12px;text-decoration:none">Profit / Taxes</a></div>');
     }
 
     document.open();
