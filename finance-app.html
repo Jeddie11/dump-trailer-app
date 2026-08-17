@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="./icons/asg-icon-192.png" />
+<link rel="apple-touch-icon" href="./icons/asg-icon-192.png" />
+<title>ASG Profit & Taxes</title>
+<style>html,body{margin:0;background:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:14px}</style>
+</head>
+<body>
+<div class="loading">Loading ASG Profit & Taxes…</div>
+<script>
+(async function(){
+  try {
+    const res = await fetch('./finance.html?v=' + Date.now(), {cache:'no-store'});
+    if (!res.ok) throw new Error('Could not load finance page');
+    let html = await res.text();
+    html = html.replaceAll('href="./index.html"', 'href="./app.html"');
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    document.body.innerHTML = '<div style="padding:24px;font-family:system-ui"><b>ASG Profit & Taxes could not load.</b><div style="margin-top:8px">Refresh the page and try again.</div></div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
