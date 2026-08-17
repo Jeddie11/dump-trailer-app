@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#000000">
+<title>ASG Quote & Profit</title>
+<style>html,body{margin:0;background:#f3f4f6;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}.loading{min-height:100vh;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:14px}</style>
+</head>
+<body>
+<div class="loading">Loading ASG Quote &amp; Profit…</div>
+<script>
+(async function(){
+  try{
+    const res=await fetch('./quote-profit.html?v='+Date.now(),{cache:'no-store'});
+    if(!res.ok) throw new Error('Could not load quote calculator');
+    let html=await res.text();
+
+    html=html.replace(
+      'const BASE_PRESETS={',
+      "const BASE_PRESETS={'Sample & Son|#57 Stone':{cost:29,basis:'ton',note:'ASG saved supplier price'},'Sample & Son|Crush & Run':{cost:23,basis:'ton',note:'ASG saved supplier price'},"
+    );
+
+    html=html.replace(
+      'Two current prices are preloaded: Thomson #57 at $43.06/ton including tax, and BP Hauling fill dirt at $100/load. Other supplier/material prices stay blank until you save them.',
+      'Built-in supplier prices: Thomson #57 at $43.06/ton including tax; Sample & Son #57 at $29/ton; Sample & Son Crusher Run at $23/ton; and BP Hauling fill dirt at $100/load. Other supplier/material prices stay blank until you save them.'
+    );
+
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(e){
+    document.body.innerHTML='<div style="padding:24px;font-family:system-ui"><b>ASG Quote & Profit could not load.</b><div style="margin-top:8px">Refresh and try again.</div></div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
